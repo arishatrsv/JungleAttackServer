@@ -1,6 +1,6 @@
 # JungleAttack
 
-### `jungleattack.servidor.aplicacion`
+### jungleattack.servidor.aplicacion
 
 **AplicacionServidor**
 - Métodos: `main(String[] args)`
@@ -8,7 +8,7 @@
 **ConfiguracionServidor**
 - Atributos estáticos: `PUERTO: int`, `MAX_PARTIDAS: int`
 
-### `jungleattack.servidor.red`
+### jungleattack.servidor.red
 
 **ServidorSockets**
 - Atributos: `puerto: int`, `activo: boolean`
@@ -18,7 +18,7 @@
 - Atributos: `socket: Socket`, `contexto: ContextoCliente`, `emisor: EmisorMensajes`, `receptor: ReceptorMensajes`
 - Métodos: `recepcionMensajes()`, `envioMensaje()`, `cierre()`
 
-### `jungleattack.servidor.protocolo`
+### jungleattack.servidor.protocolo
 
 **Mensaje**
 - Atributos: `tipo: String`, `contenido: String`
@@ -30,7 +30,7 @@
 - Atributos: `comandos: Map<String, ComandoCliente>`, `contexto: ContextoCliente`
 - Métodos: `procesamientoMensaje()`
 
-### `jungleattack.servidor.comandos`
+### jungleattack.servidor.comandos
 
 **ComandoCliente** — interfaz
 - Métodos: `ejecucion()`
@@ -60,7 +60,7 @@
 **ComandoDesconexion**
 - Métodos: `ejecucion()`
 
-### `jungleattack.servidor.partidas`
+### jungleattack.servidor.partidas
 
 **GestorPartidas**
 - Atributos: `partidas: Map<String, SesionPartida>`
@@ -79,7 +79,7 @@
 **ResumenPartida**
 - Atributos: `botsEliminados: int`, `animalesEliminados: int`, `tazasConsumidas: int`, `duracion: double`
 
-### `jungleattack.servidor.modelo`
+### jungleattack.servidor.modelo
 
 **Animal**
 - Atributos: `energia: int`, `vivo: boolean`, `posicion: Punto`, `especie: Especie`
@@ -105,7 +105,7 @@
 - Atributos: `posicion: Punto`
 - Métodos: `deteccionContacto()`
 
-### `jungleattack.servidor.mapa`
+### jungleattack.servidor.mapa
 
 **Punto**
 - Atributos: `posicionX: int`, `posicionY: int`
@@ -123,7 +123,7 @@
 **BuscadorRutas**
 - Métodos: `busquedaRuta()`
 
-### `jungleattack.servidor.reglas`
+### jungleattack.servidor.reglas
 
 **MotorJuego**
 - Atributos: `sesion: SesionPartida`
@@ -141,7 +141,7 @@
 **ReglasVictoria**
 - Métodos: `comprobacionVictoria()`, `creacionResumen()`
 
-### `jungleattack.servidor.constantes`
+### jungleattack.servidor.constantes
 
 **ConstantesJuego**
 - Atributos estáticos: `ENERGIA_MANADA_JUGADOR: int`, `ENERGIA_ANIMAL: int`, `CANTIDAD_ANIMALES_JUGADOR: int`, `CANTIDAD_ANIMALES_BOTS: int`, `DANIO_JUGADOR: int`, `DANIO_BOTS: int`, `CANTIDAD_TAZAS: int`, `ATTACK_COOLDOWN_MS: int`, `ENCOUNTER_RADIUS: double`
