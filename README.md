@@ -140,7 +140,7 @@ Administra las partidas activas y permite consultar su estado general. La estruc
 
 ### SesionPartida
 
-- Atributos: `codigo: String`, `jugadores: List<Jugador>`, `estado: EstadoPartida`, `mapa: Mapa`, `manadas: List<Manada>`, `tazas: List<Taza>`, `bandera: Bandera`, `resumen: ResumenPartida`, `motorJuego: MotorJuego`
+- Atributos: `codigo: String`, `jugadores: List<Jugador>`, `estado: EstadoPartida`, `mapa: Mapa`, `manadas: List<Manada>`, `tazas: List<Taza>`, `banderas: List<Bandera>`, `resumen: ResumenPartida`, `motorJuego: MotorJuego`
 - Métodos:
     - `inicio()`
     - `actualizacion()`
@@ -151,7 +151,7 @@ Administra las partidas activas y permite consultar su estado general. La estruc
     - `manadaPorJugador(jugador)`
     - `actualizacionEstado()`
 
-Representa una partida concreta y mantiene sus jugadores, mapa, objetos y motor de juego. Permite acceder a los animales y las manadas durante la partida.
+Representa una partida concreta y mantiene sus jugadores, mapa, objetos y motor de juego. Cada jugador tiene su propia bandera. Permite acceder a los animales y las manadas durante la partida.
 
 ### Jugador
 
@@ -177,7 +177,7 @@ Conserva las estadísticas necesarias para presentar el resultado de la partida.
 
 Hereda de `common.model.Animal`.
 
-- Atributos adicionales: `identificador: String`, `rutaActual: List<Zona>`, `destino: Punto`, `enMovimiento: boolean`, `objetivoAtaque: Animal`
+- Atributos adicionales: `rutaActual: List<Zona>`, `destino: Punto`, `enMovimiento: boolean`, `objetivoAtaque: Animal`
 - Métodos:
     - `movimiento(destino)`
     - `actualizacionPosicion()`
@@ -186,7 +186,7 @@ Hereda de `common.model.Animal`.
     - `ordenAtaque(objetivo)`
     - `detencionAtaque()`
 
-Representa un animal individual y mantiene su estado de movimiento y ataque. El servidor controla su energía, posición real, estado de vida y acciones permitidas.
+Representa un animal individual y mantiene su estado de movimiento y ataque. El identificador, la energía, el estado de vida, la posición y la especie se heredan de `common.model.Animal`. El servidor controla su energía, posición real, estado de vida y acciones permitidas.
 
 ### AnimalJugador — hereda de Animal
 
@@ -237,7 +237,7 @@ Representa una taza que puede ser consumida por el primer animal que la toque.
 - Atributos: `posicion: Punto`
 - Métodos: `deteccionContacto(animal)`
 
-Detecta el contacto de un animal con la bandera para solicitar la comprobación de la condición de victoria.
+Detecta el contacto de un animal con la bandera para solicitar la comprobación de la condición de victoria. Cada jugador tiene una bandera, y la victoria se logra al tocar la del oponente.
 
 ## jungleattack.servidor.mapa
 
@@ -291,7 +291,7 @@ Calcula una ruta válida entre zonas conectadas. Puede utilizar un algoritmo de 
 
 ### MotorJuego
 
-- Atributos: `sesion: SesionPartida`, `activo: boolean`
+- Atributos: `sesion: SesionPartida`, `hilosZona: List<HiloZona>`, `activo: boolean`
 - Métodos:
     - `actualizacionJuego()`
     - `ejecucionOrdenMovimiento(jugador, animales, destino)`
@@ -300,6 +300,15 @@ Calcula una ruta válida entre zonas conectadas. Puede utilizar un algoritmo de 
     - `actualizacionClientes()`
 
 Coordina las actualizaciones de la partida y las reglas del juego. Valida las órdenes recibidas, actualiza el estado real y comunica los cambios necesarios a los clientes.
+
+Crea y administra los hilos de las zonas de la partida.
+
+### HiloZona — implementa Runnable
+
+- Atributos: `zona: Zona`, `ultimaActualizacion: long`, `activo: boolean`
+- Métodos: `run()`, `actualizacionZona(deltaTiempo)`, `cierre()`
+
+Actualiza los animales y los objetos de una zona en cada ciclo, usando el tiempo transcurrido desde la actualización anterior. Se utiliza un hilo por zona y no un hilo por objeto, porque la cantidad de animales puede ser grande.
 
 ### ReglasMovimiento
 
@@ -322,7 +331,7 @@ Calcula las rutas y actualiza el movimiento de los animales. Las posiciones defi
     - `detencionAtaque(animal)`
     - `ataqueAutomatico(animalBot)`
 
-Gestiona los ataques individuales, el alcance, el daño y la detención de los ataques cuando el objetivo muere o deja de estar dentro del alcance.
+Gestiona los ataques individuales, el alcance, el daño y la detención de los ataques cuando el objetivo muere o deja de estar dentro del alcance. El alcance se calcula con el radio de encuentro definido en `ConstantesComunes`.
 
 Los ataques de los animales controlados por jugadores se ejecutan de acuerdo con las órdenes recibidas. Los animales de los bots atacan automáticamente según las reglas del juego.
 
@@ -362,9 +371,8 @@ Coordina la preparación de las actualizaciones que se deben comunicar a los cli
     - `DANIO_BOTS: int`
     - `CANTIDAD_TAZAS: int`
     - `ATTACK_COOLDOWN_MS: int`
-    - `ENCOUNTER_RADIUS: double`
 
-Contiene las constantes utilizadas por las reglas de la partida.
+Contiene las constantes utilizadas por las reglas de la partida. El radio de encuentro (`ENCOUNTER_RADIUS`) se define en `ConstantesComunes`, en `common`.
 
 ## common.model
 
@@ -392,6 +400,14 @@ Contiene la identificación de la especie y los datos descriptivos que pueden co
 
 El servidor conserva la lógica de las reglas, mientras que el cliente utiliza los recursos visuales y sonoros que correspondan.
 
+## common.constantes
+
+### ConstantesComunes
+
+- Atributos estáticos: `ENCOUNTER_RADIUS: double`
+
+Contiene las constantes que deben tener el mismo valor en el cliente y en el servidor. El radio de encuentro lo usa el servidor para calcular los combates y el cliente para representar la animación.
+
 ## Herencia, interfaces y polimorfismo
 
 - `common.model.Animal` es la clase común de `Animal`.
@@ -401,6 +417,7 @@ El servidor conserva la lógica de las reglas, mientras que el cliente utiliza l
 - `common.model.Punto` es la clase común de `Punto`.
 - `Manada` es la clase abstracta de `ManadaJugador` y `ManadaBots`.
 - `ComandoCliente` es implementada por los comandos concretos.
+- `HiloZona` implementa `Runnable`.
 - `ProcesadorMensajes` ejecuta los comandos mediante la interfaz `ComandoCliente`.
 - `ReglasCombate` puede trabajar con animales de jugador y bots mediante la clase base `Animal`, mientras que las decisiones específicas de los bots se mantienen en `AnimalBot`.
 
@@ -408,6 +425,7 @@ El servidor conserva la lógica de las reglas, mientras que el cliente utiliza l
 
 - `ConfiguracionServidor` contiene la configuración del servidor.
 - `ConstantesJuego` contiene las constantes de las reglas de la partida.
+- `ConstantesComunes`, en `common`, contiene las constantes compartidas con el cliente.
 
 ## Patrones de diseño
 
@@ -453,6 +471,8 @@ Cada animal pertenece a una manada y tiene una ubicación dentro del mapa. Las z
 Al cambiar de zona, el servidor actualiza la ubicación del animal y las listas de las zonas correspondientes. De esta forma, puede localizar los animales presentes, comprobar encuentros y consultar los elementos que pueden interactuar.
 
 La organización permite conservar tanto la relación entre jugadores y manadas como la ubicación de los animales dentro del mapa.
+
+Cada zona es actualizada por su propio `HiloZona`, que se ocupa únicamente de los animales y los objetos que están en ella.
 
 ## Diagrama de clases
 
@@ -595,7 +615,7 @@ classDiagram
         -mapa: Mapa
         -manadas: List~Manada~
         -tazas: List~Taza~
-        -bandera: Bandera
+        -banderas: List~Bandera~
         -resumen: ResumenPartida
         -motorJuego: MotorJuego
         +inicio()
@@ -635,7 +655,6 @@ classDiagram
     SesionPartida --> ResumenPartida
 
     class Animal {
-        -identificador: String
         -energia: int
         -vivo: boolean
         -posicion: Punto
@@ -760,12 +779,23 @@ classDiagram
 
     class MotorJuego {
         -sesion: SesionPartida
+        -hilosZona: List~HiloZona~
         -activo: boolean
         +actualizacionJuego()
         +ejecucionOrdenMovimiento(jugador, animales, destino)
         +ejecucionOrdenAtaque(jugador, animales, objetivo)
         +comprobacionVictoria()
         +actualizacionClientes()
+    }
+
+    class HiloZona {
+        <<Runnable>>
+        -zona: Zona
+        -ultimaActualizacion: long
+        -activo: boolean
+        +run()
+        +actualizacionZona(deltaTiempo)
+        +cierre()
     }
 
     class ReglasMovimiento {
@@ -808,6 +838,8 @@ classDiagram
     SesionPartida --> Bandera
     SesionPartida --> Manada
     SesionPartida --> MotorJuego
+    MotorJuego --> HiloZona
+    HiloZona --> Zona
     MotorJuego --> ReglasMovimiento
     MotorJuego --> ReglasCombate
     MotorJuego --> ReglasObjetos
@@ -828,8 +860,14 @@ classDiagram
         +DANIO_BOTS: int$
         +CANTIDAD_TAZAS: int$
         +ATTACK_COOLDOWN_MS: int$
+    }
+
+    class ConstantesComunes {
+        <<common.constantes>>
         +ENCOUNTER_RADIUS: double$
     }
+
+    ReglasCombate ..> ConstantesComunes
 
     ServidorSockets --> ManejadorCliente
     ManejadorCliente --> ContextoCliente
