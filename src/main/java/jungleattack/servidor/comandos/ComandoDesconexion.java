@@ -1,5 +1,7 @@
 package jungleattack.servidor.comandos;
 
+import common.constantes.ConstantesProtocolo;
+import jungleattack.servidor.partidas.EstadoPartida;
 import jungleattack.servidor.partidas.GestorPartidas;
 import jungleattack.servidor.partidas.Jugador;
 import jungleattack.servidor.partidas.SesionPartida;
@@ -24,12 +26,18 @@ public class ComandoDesconexion implements ComandoCliente {
         if (jugador != null) {
             jugador.desconexion();
         }
-
-        // Si ya no queda nadie conectado en la partida, la quito del gestor.
-        if (sesion != null && sesion.cantidadJugadoresConectados() == 0) {
-            gestorPartidas.eliminacionPartida(sesion.consultaCodigo());
+        if (sesion == null) {
+            return; //El cliente nunca entró a una partida, no hay nada más que limpiar
         }
 
-        //Falta proximo paso
+        if (sesion.cantidadJugadoresConectados() == 0) {
+            gestorPartidas.eliminacionPartida(sesion.consultaCodigo());
+        } else if (sesion.consultaEstado() == EstadoPartida.ESPERANDO_JUGADOR
+                || sesion.consultaEstado() == EstadoPartida.SELECCION_ESPECIE) {
+            sesion.cancelacion(ConstantesProtocolo.MOTIVO_OPONENTE_DESCONECTADO);
+            gestorPartidas.eliminacionPartida(sesion.consultaCodigo());
+        }
+        // TODO (cuando haya partida en curso): 
+        // decidir qué pasa si un jugador se va jugando (por ejemplo gana el otro)
     }
 }

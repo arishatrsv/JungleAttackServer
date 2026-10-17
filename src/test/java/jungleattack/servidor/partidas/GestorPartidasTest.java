@@ -77,7 +77,7 @@ class GestorPartidasTest {
     void cuentaLosJugadoresConectados() {
         GestorPartidas gestor = crearGestor();
         SesionPartida sesion = gestor.creacionPartida();
-        Jugador ana = new Jugador("Ana");
+        Jugador ana = new Jugador("Ana", null);
         sesion.registroJugador(ana);
         assertEquals(1, gestor.cantidadJugadoresConectados());
         ana.desconexion();

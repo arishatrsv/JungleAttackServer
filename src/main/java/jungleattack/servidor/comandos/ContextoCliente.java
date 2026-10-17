@@ -9,12 +9,15 @@ import jungleattack.servidor.red.ManejadorCliente;
 //Hay un contexto por cada conexión de cliente. Por eso no se mezclan datos de clientes.
 
 public class ContextoCliente {
+    //Jugador del cliente. Es null hasta que se cree o se una a una partida
+    // Es volatile porque otro hilo (el del otro jugador) puede cambiarlo si se cancela la partida.
+    private volatile Jugador jugador;
 
-    private Jugador jugador; //Jugador del cliente. Es null hasta que se cree o se una a una partida
+    // Partida en la que está este cliente. También es null hasta que entre a una.
+    private volatile SesionPartida sesion;
 
-    private SesionPartida sesion; //Partida en la que está el cliente. También es null hasta que entre a una partida
-
-    private ManejadorCliente conexion; //Conexión del cliente. Se usa para enviar mensajes al cliente.
+    // Conexión de este cliente: por aquí se envian los mensajes.
+    private final ManejadorCliente conexion;
 
     public ContextoCliente(ManejadorCliente conexion) {
         this.conexion = conexion;
