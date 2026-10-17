@@ -8,10 +8,7 @@ import jungleattack.servidor.partidas.SesionPartida;
 import jungleattack.servidor.protocolo.ConversorMensajes;
 import jungleattack.servidor.protocolo.Mensaje;
 
-//Comando del cliente que quiere crear una partida nueva.
-//Mensaje que espera: CREATE_MATCH con el campo "apodo".
-//Respuesta si todo sale bien: hace MATCH_CREATED con el campo "codigo".
-//Si algo falla: da eror con el campo "motivo".
+// Comando que crea una partida nueva y asocia al cliente que lo envía como primer jugador.
 
 public class ComandoCrearPartida implements ComandoCliente {
     // El gestor es donde viven todas las partidas del servidor.
@@ -23,7 +20,7 @@ public class ComandoCrearPartida implements ComandoCliente {
     @Override
     public void ejecucion(Mensaje mensaje, ContextoCliente contexto) {
         // Un cliente no puede crear una segunda partida si ya está en una.
-        if (contexto.consultarSesion() != null) {
+        if (contexto.consultaSesion() != null) {
             enviarError(contexto, ConstantesProtocolo.MOTIVO_YA_EN_PARTIDA);
             return;
         }
@@ -35,16 +32,23 @@ public class ComandoCrearPartida implements ComandoCliente {
             return;
         }
 
-        //El cliente que crea la partida es el primer jugador.
+        // Pide la partida al gestor. Devuelve null si ya se llegó al máximo de partidas.
+        SesionPartida sesion = gestorPartidas.creacionPartida();
+        if (sesion == null) {
+            enviarError(contexto, ConstantesProtocolo.MOTIVO_SERVIDOR_LLENO);
+            return;
+        }
+        // El cliente que crea la partida es el primer jugador.
         Jugador jugador = new Jugador(apodo.trim());
         sesion.registroJugador(jugador);
-        contexto.actualizacionContexto(jugador, sesion); //El cliente queda asociado avatar y partida
-
-        //Envia mensaje para que lo comparta con el otro jugador.
+        contexto.actualizacionContexto(jugador, sesion); // El cliente queda asociado al jugador y a la partida
+        
+        // Envía mensaje para que comparta el código de la partida.
         contexto.envioMensaje(ConversorMensajes.creacionMensaje(
                 ConstantesProtocolo.PARTIDA_CREADA,
                 ConstantesProtocolo.CAMPO_CODIGO, sesion.consultaCodigo()));
-    }
+            }
+
     // Envía un mensaje de error con el motivo.
     private void enviarError(ContextoCliente contexto, String motivo) {
         contexto.envioMensaje(ConversorMensajes.creacionMensaje(

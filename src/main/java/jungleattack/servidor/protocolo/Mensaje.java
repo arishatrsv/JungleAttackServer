@@ -1,42 +1,21 @@
 package jungleattack.servidor.protocolo;
 
-import common.constantes.ConstantesProtocolo;
-import jungleattack.servidor.comandos.ComandoCliente;
-import jungleattack.servidor.comandos.ComandoCrearPartida;
-import jungleattack.servidor.comandos.ComandoDesconexion;
-import jungleattack.servidor.comandos.ContextoCliente;
-import jungleattack.servidor.partidas.GestorPartidas;
-import java.util.HashMap;
-import java.util.Map;
+// Representa un mensaje que llega del cliente
+public class Mensaje {
 
-// Procesa los mensajes que llegan del cliente
-public class ProcesadorMensajes {
+    private final String tipo;
+    private final String contenido; // los datos, escritos como texto JSON
 
-    // Mapa de tipo de mensaje
-    private final Map<String, ComandoCliente> comandos = new HashMap<>();
-
-    // Contexto del cliente de está conexión
-    private final ContextoCliente contexto;
-
-    // Registra los comandos disponibles
-    public ProcesadorMensajes(GestorPartidas gestorPartidas, ContextoCliente contexto) {
-        this.contexto = contexto;
-        comandos.put(ConstantesProtocolo.CREAR_PARTIDA, new ComandoCrearPartida(gestorPartidas));
-        comandos.put(ConstantesProtocolo.DESCONEXION, new ComandoDesconexion(gestorPartidas));
+    public Mensaje(String tipo, String contenido) {
+        this.tipo = tipo;
+        this.contenido = contenido;
     }
 
-   //Procesa el mensaje recibido del cliente
-    public void procesamientoMensaje(Mensaje mensaje) {
-        ComandoCliente comando = comandos.get(mensaje.consultaTipo());
-        if (comando == null) {
-            // Distingo entre "no era un JSON válido" y "el tipo no existe" para dar un mejor error.
-            String motivo = ConstantesProtocolo.TIPO_INVALIDO.equals(mensaje.consultaTipo())
-                    ? ConstantesProtocolo.MOTIVO_MENSAJE_INVALIDO
-                    : ConstantesProtocolo.MOTIVO_TIPO_DESCONOCIDO;
-            contexto.envioMensaje(ConversorMensajes.creacionMensaje(
-                    ConstantesProtocolo.ERROR, ConstantesProtocolo.CAMPO_MOTIVO, motivo));
-            return;
-        }
-        contexto.consultaConexion().ejecucionProtegida(comando, mensaje);
+    public String consultaTipo() {
+        return tipo;
+    }
+
+    public String consultaContenido() {
+        return contenido;
     }
 }
