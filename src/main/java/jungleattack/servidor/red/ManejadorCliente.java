@@ -27,11 +27,9 @@ public class ManejadorCliente {
 
     // Procesa cada mensaje que llega
     private final ProcesadorMensajes procesador;
-
-    // Semáforo con 1 permiso
+    // Semáforo con 1 permiso, funciona como un candado
     private final Semaphore semaforo = new Semaphore(1);
-
-    // Se asegura de que el cierre de conexión se haga una vez
+    // Se asegura de que el cierre de conexión se haga solo una vez
     private final AtomicBoolean cerrado = new AtomicBoolean(false);
 
     //Prepara la conexión con el cliente, pero no la inicia.
@@ -47,17 +45,18 @@ public class ManejadorCliente {
                 procesador::procesamientoMensaje);
     }
 
-
-    /**
-     * Se queda leyendo los mensajes del cliente hasta que se desconecta.
-     * Al terminar (por la razón que sea) siempre cierra la conexión.
-     */
+    //Se queda leyendo los mensajes del cliente hasta que se desconecta.
     public void recepcionMensajes() {
         try {
             receptor.recepcionMensajes();
         } finally {
             cierre(); // el finally garantiza que se cierre aunque haya un error
         }
+    }
+
+    // Devuelve el contexto de este cliente (lo necesita la partida para sacarlo de ella si se cancela).
+    public ContextoCliente consultaContexto() {
+        return contexto;
     }
 
     //Envía un mensaje a este cliente.
