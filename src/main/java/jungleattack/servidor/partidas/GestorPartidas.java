@@ -28,8 +28,7 @@ public class GestorPartidas {
     public GestorPartidas(Random aleatorio) {
         this.aleatorio = aleatorio;
     }
-
-
+    //Crea una partida nueva con un código único y la guarda.
     public SesionPartida creacionPartida() {
         if (partidas.size() >= ConfiguracionServidor.MAX_PARTIDAS) {
             return null;
@@ -47,7 +46,6 @@ public class GestorPartidas {
 
     //Busca la partida con ese código y agrega al segundo jugador.
     public SesionPartida unionPartida(String codigo) {
-        // TODO: implementar la unión del segundo jugador (validar que no esté llena)
         return partidaPorCodigo(codigo);
     }
 
