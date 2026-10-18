@@ -39,6 +39,16 @@ public class Jugador {
         this.especie = especie;
     }
 
+   //Marca al jugador como desconectado. 
+    // La manada se asigna cuando empieza la partida.
+    public void asignacionManada(ManadaJugador manada) {
+        this.manada = manada;
+    }
+
+    public ManadaJugador consultaManada() {
+        return manada;
+    }
+
     //Marca al jugador como desconectado. 
     public void desconexion() {
         this.conectado = false;

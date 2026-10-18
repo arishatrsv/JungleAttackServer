@@ -3,7 +3,9 @@ package jungleattack.servidor.partidas;
 import common.constantes.ConstantesProtocolo;
 import common.model.Especie;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.CopyOnWriteArrayList;
 import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Mapa;
@@ -11,10 +13,14 @@ import jungleattack.servidor.mapa.Zona;
 import jungleattack.servidor.modelo.Animal;
 import jungleattack.servidor.modelo.Bandera;
 import jungleattack.servidor.modelo.Manada;
+import jungleattack.servidor.modelo.ManadaBots;
+import jungleattack.servidor.modelo.ManadaJugador;
 import jungleattack.servidor.modelo.Taza;
 import jungleattack.servidor.protocolo.ConversorMensajes;
 import jungleattack.servidor.red.ManejadorCliente;
+import jungleattack.servidor.reglas.ActualizadorPartida;
 import jungleattack.servidor.reglas.MotorJuego;
+import jungleattack.servidor.reglas.ReglasObjetos;
 
 
 // Representa una partida en curso, con sus jugadores, estado y elementos del juego.
@@ -25,20 +31,27 @@ public class SesionPartida {
     private final List<Jugador> jugadores = new CopyOnWriteArrayList<>();
     // volatile porque lo cambian y lo leen hilos distintos.
     private volatile EstadoPartida estado;
-
-    private Mapa mapa;
-    private List<Manada> manadas;
-    private List<Taza> tazas;
-
+    // Se crea al iniciar la partida. volatile porque lo leen otros hilos.
+    private volatile Mapa mapa;
+    // Las 7 manadas: las 2 de los jugadores y las 5 de los bots.
+    private final List<Manada> manadas = new CopyOnWriteArrayList<>();
+    private final List<Taza> tazas = new CopyOnWriteArrayList<>();
     // Una bandera por jugador gana quien toque la del oponente.
-    private List<Bandera> banderas;
+    private final List<Bandera> banderas = new CopyOnWriteArrayList<>();
     private ResumenPartida resumen;
     private MotorJuego motorJuego;
+    private final Random aleatorio; //para poder repetir el sorteo de zonas y tazas en las pruebas.
 
     // Crea la partida en estado de espera, hasta que llegue el segundo jugador.
     public SesionPartida(String codigo) {
+        this(codigo, new Random());
+    }
+
+    // Constructor con generador controlado para que las pruebas sean repetibles.
+    public SesionPartida(String codigo, Random aleatorio) {
         this.codigo = codigo;
         this.estado = EstadoPartida.ESPERANDO_JUGADOR;
+        this.aleatorio = aleatorio;
     }
 
     //Agrega un jugador a la partida.
@@ -66,7 +79,7 @@ public class SesionPartida {
     }
 
     // Especies que todavía nadie ha elegido
-    public List<Especie> especiesDisponibles() {
+    public synchronized List<Especie> especiesDisponibles() {
         List<Especie> disponibles = new ArrayList<>(List.of(Especie.values()));
         for (Jugador jugador : jugadores) {
             disponibles.remove(jugador.consultaEspecie()); // si es null no quita nada
@@ -75,7 +88,7 @@ public class SesionPartida {
     }
 
     // Dice si los dos jugadores ya eligieron su especie.
-    public boolean seleccionCompleta() {
+    public synchronized boolean seleccionCompleta() {
         if (jugadores.size() < ConstantesJuego.CANTIDAD_JUGADORES) { //Todavía no hay dos jugadores
             return false;
         }
@@ -151,9 +164,52 @@ public class SesionPartida {
         return List.copyOf(jugadores); // copia de solo lectura
     }
 
-    public void inicio() {
-        // TODO: implementar
+    public synchronized boolean inicio() {
+        if (estado != EstadoPartida.SELECCION_ESPECIE || !seleccionCompleta()) { // Solo inicia si sigue en selección y todos los jugadores eligieron especie.
+            return false; // Si no se cumple alguna condición, no modifica la partida.
+        }
+        Mapa nuevoMapa = new Mapa(); // Crea el mapa que se usará durante esta partida.
+        nuevoMapa.generacionMapa(); // Genera sus zonas y demás elementos del terreno.
+
+        // Se mezclan las zonas y se reparten en orden: así las 7 manadas quedan en zonas distintas.
+        List<Zona> zonasSorteadas = new ArrayList<>(nuevoMapa.consultaZonas()); // Copia las zonas para poder mezclarlas sin alterar la lista del mapa.
+        Collections.shuffle(zonasSorteadas, aleatorio); // Sortea el orden de reparto usando el generador aleatorio de la partida.
+        int siguienteZona = 0; // Lleva el índice de la próxima zona que se asignará.
+
+        for (Jugador jugador : jugadores) {
+            Zona zona = zonasSorteadas.get(siguienteZona++); // Reserva para este jugador una zona distinta de las ya repartidas.
+            ManadaJugador manada = new ManadaJugador(jugador.consultaEspecie()); // Crea su manada con la especie que seleccionó.
+            ubicacionManada(manada, ConstantesJuego.CANTIDAD_ANIMALES_JUGADOR, zona); // Crea y registra sus animales en la zona y en la partida.
+            jugador.asignacionManada(manada); // Vincula la manada creada con el jugador.
+            banderas.add(new Bandera(jugador, zona)); // Coloca la bandera del jugador en su zona inicial.
+        }
+        // Los bots son las especies que los jugadores no eligieron (cada una en una zona distinta).
+        for (Especie especie : especiesDisponibles()) {
+            Zona zona = zonasSorteadas.get(siguienteZona++); // Asigna a cada especie de bot una zona todavía libre.
+            ubicacionManada(new ManadaBots(especie), ConstantesJuego.CANTIDAD_ANIMALES_BOTS, zona); // Crea sus animales y los registra en esa zona.
+        }
+
+        for (Taza taza : new ReglasObjetos().colocacionTazas(nuevoMapa, aleatorio)) {
+            tazas.add(taza); // Guarda la taza en la lista de objetos de esta partida.
+            nuevoMapa.zonaPorPosicion(taza.consultaPosicion()).registroTaza(taza); // La registra también en la zona del mapa donde quedó colocada.
+        }
+
+        resumen = new ResumenPartida(); // Prepara el resumen para registrar los resultados de la partida.
+        mapa = nuevoMapa; // Guarda como mapa activo el que se acaba de preparar.
+        estado = EstadoPartida.EN_CURSO; // Cambia el estado antes de notificar que la partida comenzó.
+        new ActualizadorPartida(this).envioInicio(); // Envía a los jugadores la información inicial de la partida.
+        return true; // Indica que el inicio se completó correctamente.
     }
+
+    // Crea los animales de una manada alrededor del centro de la zona y los registra en ella.
+    private void ubicacionManada(Manada manada, int cantidad, Zona zona) {
+        manada.creacionAnimales(cantidad, zona.consultaPosicion());
+        for (Animal animal : manada.consultaAnimales()) {
+            zona.registroAnimal(animal);
+        }
+        manadas.add(manada);
+    }
+
 
     public void actualizacion() {
         // TODO: implementar
@@ -163,19 +219,44 @@ public class SesionPartida {
         // TODO: implementar
     }
 
+    // Busca un animal de la partida (de cualquier manada) por su identificador, o null si no existe.
     public Animal animalPorIdentificador(String identificador) {
-        // TODO: implementar
+        for (Manada manada : manadas) {
+            Animal animal = manada.animalPorIdentificador(identificador);
+            if (animal != null) {
+                return animal;
+            }
+        }
         return null;
     }
 
     public List<Animal> animalesEnZona(Zona zona) {
-        // TODO: implementar
-        return null;
+        return zona.animalesEnZona();
     }
 
     public Manada manadaPorJugador(Jugador jugador) {
-        // TODO: implementar
-        return null;
+        return jugador.consultaManada();
+    }
+
+    // Mapa de la partida: es null hasta que la partida empieza.
+    public Mapa consultaMapa() {
+        return mapa;
+    }
+
+    public List<Manada> consultaManadas() {
+        return List.copyOf(manadas);
+    }
+
+    public List<Taza> consultaTazas() {
+        return List.copyOf(tazas);
+    }
+
+    public List<Bandera> consultaBanderas() {
+        return List.copyOf(banderas);
+    }
+
+    public ResumenPartida consultaResumen() {
+        return resumen;
     }
 
     // Devuelve el otro jugador de la partida, o null si todavía no hay otro.

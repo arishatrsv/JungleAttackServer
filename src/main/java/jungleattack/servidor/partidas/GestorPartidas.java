@@ -37,7 +37,7 @@ public class GestorPartidas {
         //si dos hilos generan el mismo código a la vez, solo uno de los dos lo logra guardar.
         while (true) {
             String codigo = generacionCodigo();
-            SesionPartida sesion = new SesionPartida(codigo);
+            SesionPartida sesion = new SesionPartida(codigo, aleatorio);
             if (partidas.putIfAbsent(codigo, sesion) == null) {
                 return sesion;
             }

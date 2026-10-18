@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonObject;
 import common.constantes.ConstantesProtocolo;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -205,6 +206,70 @@ class ServidorIntegracionTest {
             String nuevoCodigo = ana.leerCampo(ConstantesProtocolo.PARTIDA_CREADA, ConstantesProtocolo.CAMPO_CODIGO);
             assertNotNull(nuevoCodigo);
             assertTrue(nuevoCodigo.length() == 4);
+        } finally {
+            servidor.cierre();
+        }
+    }
+
+    // Lleva a dos clientes hasta el final de la selección: ambos eligen especie y la partida empieza.
+    // Deja leídos los mensajes de lobby, de modo que lo siguiente que llega a cada uno es GAME_STARTED.
+    private void llegarAlInicio(ClientePrueba ana, ClientePrueba segundoJugador) throws IOException {
+        ana.enviar(ConstantesProtocolo.CREAR_PARTIDA, ConstantesProtocolo.CAMPO_APODO, "Ana");
+        String codigo = ana.leerCampo(ConstantesProtocolo.PARTIDA_CREADA, ConstantesProtocolo.CAMPO_CODIGO);
+        segundoJugador.enviar(ConstantesProtocolo.UNIRSE_PARTIDA,
+                ConstantesProtocolo.CAMPO_APODO, "Jugador2", ConstantesProtocolo.CAMPO_CODIGO, codigo);
+        segundoJugador.leer(); // Confirmación de unión.
+        segundoJugador.leer(); // Selección de especies.
+        ana.leer(); // Selección de especies.
+        ana.enviar(ConstantesProtocolo.SELECCIONAR_ANIMAL, ConstantesProtocolo.CAMPO_ESPECIE, "jaguar");
+        ana.leer(); // Actualización de la selección.
+        segundoJugador.leer();
+        segundoJugador.enviar(ConstantesProtocolo.SELECCIONAR_ANIMAL, ConstantesProtocolo.CAMPO_ESPECIE, "tucan");
+        ana.leer(); // Selección completa.
+        segundoJugador.leer();
+    }
+
+    @Test
+    void cuandoLosDosEligenLaPartidaEmpiezaYCadaUnoRecibeSuInicio() throws Exception {
+        int[] puerto = new int[1];
+        ServidorSockets servidor = arrancarServidor(puerto);
+        try (ClientePrueba ana = new ClientePrueba(puerto[0]); ClientePrueba segundoJugador = new ClientePrueba(puerto[0])) {
+            llegarAlInicio(ana, segundoJugador);
+
+            Mensaje inicioAna = ana.leer();
+            Mensaje inicioSegundo = segundoJugador.leer();
+            assertEquals(ConstantesProtocolo.PARTIDA_INICIADA, inicioAna.consultaTipo());
+            assertEquals(ConstantesProtocolo.PARTIDA_INICIADA, inicioSegundo.consultaTipo());
+
+            JsonObject deAna = ConversorMensajes.contenidoComoObjeto(inicioAna);
+            JsonObject deSegundo = ConversorMensajes.contenidoComoObjeto(inicioSegundo);
+            // Cada jugador empieza en una zona distinta, ve solo esa zona y recibe sus 10 animales.
+            assertEquals(1, deAna.getAsJsonArray(ConstantesProtocolo.CAMPO_ZONAS_VISIBLES).size());
+            assertEquals(1, deSegundo.getAsJsonArray(ConstantesProtocolo.CAMPO_ZONAS_VISIBLES).size());
+            assertTrue(deAna.get(ConstantesProtocolo.CAMPO_ZONA_INICIAL).getAsInt()
+                    != deSegundo.get(ConstantesProtocolo.CAMPO_ZONA_INICIAL).getAsInt());
+            assertEquals(10, deAna.getAsJsonArray(ConstantesProtocolo.CAMPO_ANIMALES).size());
+            assertEquals("jaguar", deAna.getAsJsonArray(ConstantesProtocolo.CAMPO_ANIMALES).get(0)
+                    .getAsJsonObject().get(ConstantesProtocolo.CAMPO_ESPECIE).getAsString());
+            assertEquals("tucan", deSegundo.getAsJsonArray(ConstantesProtocolo.CAMPO_ANIMALES).get(0)
+                    .getAsJsonObject().get(ConstantesProtocolo.CAMPO_ESPECIE).getAsString());
+            assertEquals(1, deAna.getAsJsonArray(ConstantesProtocolo.CAMPO_BANDERAS).size());
+        } finally {
+            servidor.cierre();
+        }
+    }
+
+    @Test
+    void siUnJugadorSeVaConLaPartidaEnCursoElOtroRecibeElError() throws Exception {
+        int[] puerto = new int[1];
+        ServidorSockets servidor = arrancarServidor(puerto);
+        try (ClientePrueba ana = new ClientePrueba(puerto[0])) {
+            try (ClientePrueba segundoJugador = new ClientePrueba(puerto[0])) {
+                llegarAlInicio(ana, segundoJugador);
+                ana.leer(); // GAME_STARTED
+                segundoJugador.leer(); // GAME_STARTED
+            } // El segundo jugador se desconecta con la partida en curso.
+            ana.esperarError(ConstantesProtocolo.MOTIVO_OPONENTE_DESCONECTADO);
         } finally {
             servidor.cierre();
         }

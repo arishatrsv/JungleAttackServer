@@ -47,6 +47,22 @@ public class ConversorMensajes {
         return new Mensaje(tipo, contenido.toString());
     }
 
+    // Crea un mensaje cuyo contenido ya está armado como objeto JSON. Sirve para los mensajes con listas y objetos
+    // anidados, que no se pueden expresar solo con pares campo-valor de texto.
+    public static Mensaje creacionMensajeConContenido(String tipo, JsonObject contenido) {
+        return new Mensaje(tipo, contenido.toString());
+    }
+
+    // Devuelve el contenido del mensaje como objeto JSON, para leer sus listas y objetos anidados.
+    public static JsonObject contenidoComoObjeto(Mensaje mensaje) {
+        try {
+            return JsonParser.parseString(mensaje.consultaContenido()).getAsJsonObject();
+        } catch (RuntimeException e) {
+            throw new IllegalArgumentException("El contenido del mensaje no es un objeto JSON", e);
+            //IllegalArgumentException si el contenido no es un objeto JSON válido
+        }
+    }
+
     // Devuelve el valor de un campo del contenido del mensaje, o null si no existe.
     public static String campoDelContenido(Mensaje mensaje, String campo) {
         try {

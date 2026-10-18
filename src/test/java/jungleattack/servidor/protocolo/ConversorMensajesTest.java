@@ -1,9 +1,12 @@
 package jungleattack.servidor.protocolo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
 
 class ConversorMensajesTest {
@@ -50,5 +53,30 @@ class ConversorMensajesTest {
     void sinContenidoQuedaComoObjetoVacio() {
         Mensaje mensaje = ConversorMensajes.conversionDesdeJson("{\"tipo\":\"X\"}");
         assertEquals("{}", mensaje.consultaContenido());
+    }
+
+    @Test
+    void unContenidoConListasYObjetosAnidadosSeConservaEnLaIdaYVuelta() {
+        JsonObject contenido = new JsonObject();
+        JsonArray zonas = new JsonArray();
+        zonas.add(7);
+        contenido.addProperty("zonaInicial", 7);
+        contenido.add("zonasVisibles", zonas);
+        Mensaje mensaje = ConversorMensajes.creacionMensajeConContenido("GAME_STARTED", contenido);
+        Mensaje recuperado = ConversorMensajes.conversionDesdeJson(ConversorMensajes.conversionAJson(mensaje));
+
+        JsonObject leido = ConversorMensajes.contenidoComoObjeto(recuperado);
+        assertEquals("GAME_STARTED", recuperado.consultaTipo());
+        assertEquals(7, leido.get("zonaInicial").getAsInt());
+        assertEquals(1, leido.getAsJsonArray("zonasVisibles").size());
+        assertTrue(leido.getAsJsonArray("zonasVisibles").get(0).getAsInt() == 7);
+    }
+
+    @Test
+    void unContenidoQueNoEsUnObjetoJsonLanzaExcepcion() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ConversorMensajes.contenidoComoObjeto(new Mensaje("X", "[1,2]")));
+        assertThrows(IllegalArgumentException.class,
+                () -> ConversorMensajes.contenidoComoObjeto(new Mensaje("X", "no es json {")));
     }
 }
