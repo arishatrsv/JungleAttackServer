@@ -15,4 +15,10 @@ public class ConstantesJuego {
     public static final String CARACTERES_CODIGO_PARTIDA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; // Solo mayúsculas y números. 
     public static final int LONGITUD_MAXIMA_APODO = 20; //Largo máximo del apodo
     public static final int CANTIDAD_JUGADORES = 2; 
+
+    //Cómo se colocan los animales y las tazas al empezar la partida
+    public static final int RADIO_FORMACION = 30; //los animales de una manada se reparten en círculo alrededor del centro de su zona
+    public static final int DISTANCIA_MINIMA_TAZA_ZONA = 40; //Distancia mínima entre una taza y el centro de las dos zonas que une su camino
+    public static final String SEPARADOR_IDENTIFICADOR = "-"; // jaguar-1, jaguar-2... taza-1, taza-2..
+    public static final String PREFIJO_TAZA = "taza";
 }

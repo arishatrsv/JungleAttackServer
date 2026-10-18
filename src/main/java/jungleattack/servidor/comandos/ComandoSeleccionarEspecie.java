@@ -44,6 +44,7 @@ public class ComandoSeleccionarEspecie implements ComandoCliente {
         }
         // Aviso a los dos jugadores cómo quedó la selección.
         sesion.actualizacionEstado();
+        sesion.inicio(); //Si ya eligieron los dos,empieza la partida
         // TODO (siguiente paso): cuando los dos eligieron, empezar la partida (GAME_STARTED).
     }
     private void enviarError(ContextoCliente contexto, String motivo) {

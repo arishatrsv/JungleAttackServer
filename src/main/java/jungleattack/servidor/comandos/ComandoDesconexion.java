@@ -32,12 +32,11 @@ public class ComandoDesconexion implements ComandoCliente {
 
         if (sesion.cantidadJugadoresConectados() == 0) {
             gestorPartidas.eliminacionPartida(sesion.consultaCodigo());
-        } else if (sesion.consultaEstado() == EstadoPartida.ESPERANDO_JUGADOR
-                || sesion.consultaEstado() == EstadoPartida.SELECCION_ESPECIE) {
+        } else if (sesion.consultaEstado() != EstadoPartida.FINALIZADA) {
+            //Si el jugador se va antes de que termine la partida, la partida se cancela y
+            //el otro jugador recibe el error.
             sesion.cancelacion(ConstantesProtocolo.MOTIVO_OPONENTE_DESCONECTADO);
             gestorPartidas.eliminacionPartida(sesion.consultaCodigo());
         }
-        // TODO (cuando haya partida en curso): 
-        // decidir qué pasa si un jugador se va jugando (por ejemplo gana el otro)
     }
 }
