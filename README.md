@@ -314,7 +314,7 @@ Actualiza los animales y los objetos de una zona en cada ciclo, usando el tiempo
 
 - Métodos:
     - `calculoRuta(origen, destino)`
-    - `validacionMovimiento(jugador, animales, destino)`
+    - `validarMovimiento(jugador, animales, destino)`
     - `inicioMovimiento(animal, destino)`
     - `actualizacionPosicion(animal, deltaTiempo)`
     - `finalizacionMovimiento(animal)`
@@ -800,7 +800,7 @@ classDiagram
 
     class ReglasMovimiento {
         +calculoRuta(origen, destino)
-        +validacionMovimiento(jugador, animales, destino)
+        +validarMovimiento(jugador, animales, destino)
         +inicioMovimiento(animal, destino)
         +actualizacionPosicion(animal, deltaTiempo)
         +finalizacionMovimiento(animal)
