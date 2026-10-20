@@ -66,7 +66,6 @@ public class Mapa {
         } 
     }
 
-    
     private Zona lecturaZona(JsonObject datos) {
         int identificador = datos.get(ConstantesComunes.ZONA_ID).getAsInt();
         String nombre = datos.get(ConstantesComunes.ZONA_NOMBRE).getAsString();
@@ -113,6 +112,7 @@ public class Mapa {
     }
 
     //Devuelve la zona donde está un punto del mapa. 
+    //Si el punto cae justo en el borde entre zonas devuelve la zona cuyo centro esté más cerca.
     public Zona zonaPorPosicion(common.model.Punto posicion) {
         Zona masCercana = null;
         double menorDistancia = Double.MAX_VALUE;
@@ -133,13 +133,13 @@ public class Mapa {
     //para que ninguna zona guarde un animal que ya no está y actualice
     public void actualizacionUbicacionAnimal(Animal animal) {
         Zona destino = zonaPorPosicion(animal.consultaPosicion());
+        if (destino != null) {
+            destino.registroAnimal(animal);
+        }
         for (Zona zona : zonas) {
             if (zona != destino) {
                 zona.eliminacionAnimal(animal);
             }
-        }
-        if (destino != null) {
-            destino.registroAnimal(animal);
         }
     }
 

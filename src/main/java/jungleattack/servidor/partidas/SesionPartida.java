@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.function.LongSupplier;
 import java.util.concurrent.CopyOnWriteArrayList;
 import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Mapa;
@@ -22,7 +23,6 @@ import jungleattack.servidor.reglas.ActualizadorPartida;
 import jungleattack.servidor.reglas.MotorJuego;
 import jungleattack.servidor.reglas.ReglasObjetos;
 
-
 // Representa una partida en curso, con sus jugadores, estado y elementos del juego.
 public class SesionPartida {
     // Código con el que el otro jugador se une a la partida.
@@ -36,10 +36,16 @@ public class SesionPartida {
     // Las 7 manadas: las 2 de los jugadores y las 5 de los bots.
     private final List<Manada> manadas = new CopyOnWriteArrayList<>();
     private final List<Taza> tazas = new CopyOnWriteArrayList<>();
+
     // Una bandera por jugador gana quien toque la del oponente.
     private final List<Bandera> banderas = new CopyOnWriteArrayList<>();
     private ResumenPartida resumen;
+    //Coordina el movimiento y las actualizaciones. Se crea al iniciar la partida.
     private MotorJuego motorJuego;
+    //Si es false el motor no arranca sus hilos.
+    private final boolean motorActivo;
+    private final LongSupplier reloj;
+
     private final Random aleatorio; //para poder repetir el sorteo de zonas y tazas en las pruebas.
 
     // Crea la partida en estado de espera, hasta que llegue el segundo jugador.
@@ -49,9 +55,19 @@ public class SesionPartida {
 
     // Constructor con generador controlado para que las pruebas sean repetibles.
     public SesionPartida(String codigo, Random aleatorio) {
+        this(codigo, aleatorio, true);
+    }
+
+    public SesionPartida(String codigo, Random aleatorio, boolean motorActivo) {
+        this(codigo, aleatorio, motorActivo, System::currentTimeMillis);
+    }
+
+    public SesionPartida(String codigo, Random aleatorio, boolean motorActivo, LongSupplier reloj) {
         this.codigo = codigo;
-        this.estado = EstadoPartida.ESPERANDO_JUGADOR;
         this.aleatorio = aleatorio;
+        this.motorActivo = motorActivo; //el motor debe arrancar los hilos al empezar la partida
+        this.reloj = reloj; //fuente del tiempo
+        this.estado = EstadoPartida.ESPERANDO_JUGADOR;
     }
 
     //Agrega un jugador a la partida.
@@ -103,6 +119,9 @@ public class SesionPartida {
     //Cancela la partida y avisa a los jugadores conectados.
     public synchronized void cancelacion(String motivo) {
         estado = EstadoPartida.FINALIZADA;
+        if (motorJuego != null) {
+            motorJuego.cierre(); // se detienen los hilos de la partida
+        }
         for (Jugador jugador : jugadores) {
             if (jugador.consultaConectado()) {
                 // Primero lo saca de la partida y DESPUÉS le avisa. 
@@ -197,8 +216,13 @@ public class SesionPartida {
         resumen = new ResumenPartida(); // Prepara el resumen para registrar los resultados de la partida.
         mapa = nuevoMapa; // Guarda como mapa activo el que se acaba de preparar.
         estado = EstadoPartida.EN_CURSO; // Cambia el estado antes de notificar que la partida comenzó.
-        new ActualizadorPartida(this).envioInicio(); // Envía a los jugadores la información inicial de la partida.
-        return true; // Indica que el inicio se completó correctamente.
+        motorJuego = new MotorJuego(this, reloj); //El motor se crea apenas empieza la partida ya lo encuentra.
+        estado = EstadoPartida.EN_CURSO;
+        new ActualizadorPartida(this).envioInicio();
+        if (motorActivo) {
+            motorJuego.arranque();
+        }
+        return true;
     }
 
     // Crea los animales de una manada alrededor del centro de la zona y los registra en ella.
@@ -253,6 +277,10 @@ public class SesionPartida {
 
     public List<Bandera> consultaBanderas() {
         return List.copyOf(banderas);
+    }
+
+    public MotorJuego consultaMotor() {
+        return motorJuego;
     }
 
     public ResumenPartida consultaResumen() {

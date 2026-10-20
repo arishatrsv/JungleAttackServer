@@ -4,6 +4,7 @@ import common.constantes.ConstantesProtocolo;
 import jungleattack.servidor.comandos.ComandoCliente;
 import jungleattack.servidor.comandos.ComandoCrearPartida;
 import jungleattack.servidor.comandos.ComandoDesconexion;
+import jungleattack.servidor.comandos.ComandoMoverAnimales;
 import jungleattack.servidor.comandos.ComandoSeleccionarEspecie;
 import jungleattack.servidor.comandos.ComandoUnirsePartida;
 import jungleattack.servidor.comandos.ContextoCliente;
@@ -26,6 +27,7 @@ public class ProcesadorMensajes {
         comandos.put(ConstantesProtocolo.CREAR_PARTIDA, new ComandoCrearPartida(gestorPartidas));
         comandos.put(ConstantesProtocolo.UNIRSE_PARTIDA, new ComandoUnirsePartida(gestorPartidas));
         comandos.put(ConstantesProtocolo.SELECCIONAR_ANIMAL, new ComandoSeleccionarEspecie());
+        comandos.put(ConstantesProtocolo.MOVER_ANIMALES, new ComandoMoverAnimales());
         comandos.put(ConstantesProtocolo.DESCONEXION, new ComandoDesconexion(gestorPartidas));
     }
 

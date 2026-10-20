@@ -10,7 +10,6 @@ import jungleattack.servidor.protocolo.Mensaje;
 
 //Comando del cliente que elige su especie para jugar.
 public class ComandoSeleccionarEspecie implements ComandoCliente {
-
     @Override
     public void ejecucion(Mensaje mensaje, ContextoCliente contexto) {
         SesionPartida sesion = contexto.consultaSesion();
@@ -45,7 +44,6 @@ public class ComandoSeleccionarEspecie implements ComandoCliente {
         // Aviso a los dos jugadores cómo quedó la selección.
         sesion.actualizacionEstado();
         sesion.inicio(); //Si ya eligieron los dos,empieza la partida
-        // TODO (siguiente paso): cuando los dos eligieron, empezar la partida (GAME_STARTED).
     }
     private void enviarError(ContextoCliente contexto, String motivo) {
         contexto.envioMensaje(ConversorMensajes.creacionMensaje(
