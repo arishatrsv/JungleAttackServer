@@ -7,7 +7,7 @@ import jungleattack.servidor.mapa.Punto;
 // Manada de bots: 4 animales con 10 de energía y daño 1, controlados por el servidor.
 public class ManadaBots extends Manada {
     public ManadaBots(Especie especie) {
-        super(especie, ConstantesJuego.DANIO_BOTS, ConstantesJuego.ENERGIA_ANIMAL);
+        super(especie, ConstantesJuego.DANIO_BOTS, ConstantesJuego.ENERGIA_ANIMAL_BOTS);
     }
 
     @Override

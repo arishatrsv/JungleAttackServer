@@ -6,7 +6,7 @@ package jungleattack.servidor.aplicacion;
 
 public class ConfiguracionServidor {
 
-    public static final int PUERTO = 5000;
+    public static final int PUERTO = 5001;
 
     public static final int MAX_PARTIDAS = 100;
 }
