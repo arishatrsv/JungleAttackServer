@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import common.constantes.ConstantesProtocolo;
 import java.io.BufferedReader;
@@ -270,6 +271,120 @@ class ServidorIntegracionTest {
                 segundoJugador.leer(); // GAME_STARTED
             } // El segundo jugador se desconecta con la partida en curso.
             ana.esperarError(ConstantesProtocolo.MOTIVO_OPONENTE_DESCONECTADO);
+        } finally {
+            servidor.cierre();
+        }
+    }
+
+    // Lee mensajes de un cliente hasta recibir un STATE_UPDATE donde el animal cumple la condición.
+    // Falla si pasan 10 segundos. Devuelve los datos del animal en ese STATE_UPDATE.
+    private JsonObject esperarAnimal(ClientePrueba cliente, String idAnimal, java.util.function.Predicate<JsonObject> condicion)
+            throws IOException {
+        long limite = System.currentTimeMillis() + 10000;
+        while (System.currentTimeMillis() < limite) {
+            Mensaje mensaje = cliente.leer();
+            if (!ConstantesProtocolo.ACTUALIZACION_ESTADO.equals(mensaje.consultaTipo())) {
+                continue;
+            }
+            for (JsonElement elemento : ConversorMensajes.contenidoComoObjeto(mensaje)
+                    .getAsJsonArray(ConstantesProtocolo.CAMPO_ANIMALES)) {
+                JsonObject animal = elemento.getAsJsonObject();
+                if (idAnimal.equals(animal.get(ConstantesProtocolo.CAMPO_ID).getAsString()) && condicion.test(animal)) {
+                    return animal;
+                }
+            }
+        }
+        throw new AssertionError("No llegó el STATE_UPDATE esperado para " + idAnimal);
+    }
+
+    @Test
+    void moverAnimalesAntesDeEmpezarLaPartidaDaFaseIncorrecta() throws Exception {
+        int[] puerto = new int[1];
+        ServidorSockets servidor = arrancarServidor(puerto);
+        try (ClientePrueba ana = new ClientePrueba(puerto[0])) {
+            ana.enviar(ConstantesProtocolo.CREAR_PARTIDA, ConstantesProtocolo.CAMPO_APODO, "Ana");
+            ana.leer(); // MATCH_CREATED
+            ana.enviar(ConstantesProtocolo.MOVER_ANIMALES, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1",
+                    ConstantesProtocolo.CAMPO_X, "100", ConstantesProtocolo.CAMPO_Y, "100");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_FASE_INCORRECTA);
+        } finally {
+            servidor.cierre();
+        }
+    }
+
+    @Test
+    void lasOrdenesDeMovimientoInvalidasRecibenSuError() throws Exception {
+        int[] puerto = new int[1];
+        ServidorSockets servidor = arrancarServidor(puerto);
+        try (ClientePrueba ana = new ClientePrueba(puerto[0]); ClientePrueba segundoJugador = new ClientePrueba(puerto[0])) {
+            llegarAlInicio(ana, segundoJugador);
+            ana.leer(); // GAME_STARTED
+            segundoJugador.leer(); // GAME_STARTED
+
+            // Un animal del oponente (tucán) no se puede mover.
+            ana.enviar(ConstantesProtocolo.MOVER_ANIMALES, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "tucan-1",
+                    ConstantesProtocolo.CAMPO_X, "100", ConstantesProtocolo.CAMPO_Y, "100");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_ANIMAL_INVALIDO);
+            // Un animal que no existe.
+            ana.enviar(ConstantesProtocolo.MOVER_ANIMALES, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "dragon-9",
+                    ConstantesProtocolo.CAMPO_X, "100", ConstantesProtocolo.CAMPO_Y, "100");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_ANIMAL_INVALIDO);
+            // Sin animales.
+            ana.enviar(ConstantesProtocolo.MOVER_ANIMALES, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "",
+                    ConstantesProtocolo.CAMPO_X, "100", ConstantesProtocolo.CAMPO_Y, "100");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_ANIMAL_INVALIDO);
+            // Destino fuera del mapa.
+            ana.enviar(ConstantesProtocolo.MOVER_ANIMALES, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1",
+                    ConstantesProtocolo.CAMPO_X, "5000", ConstantesProtocolo.CAMPO_Y, "100");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_DESTINO_INVALIDO);
+            // Destino que no es un número.
+            ana.enviar(ConstantesProtocolo.MOVER_ANIMALES, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1",
+                    ConstantesProtocolo.CAMPO_X, "abc", ConstantesProtocolo.CAMPO_Y, "100");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_MENSAJE_INVALIDO);
+            // Falta el destino.
+            ana.enviar(ConstantesProtocolo.MOVER_ANIMALES, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_MENSAJE_INVALIDO);
+        } finally {
+            servidor.cierre();
+        }
+    }
+
+    @Test
+    void unaOrdenDeMovimientoLlegaALosClientesComoActualizacionesDeEstado() throws Exception {
+        int[] puerto = new int[1];
+        ServidorSockets servidor = arrancarServidor(puerto);
+        try (ClientePrueba ana = new ClientePrueba(puerto[0]); ClientePrueba segundoJugador = new ClientePrueba(puerto[0])) {
+            llegarAlInicio(ana, segundoJugador);
+            JsonObject inicio = ConversorMensajes.contenidoComoObjeto(ana.leer());
+            segundoJugador.leer(); // GAME_STARTED
+
+            // Destino: un punto del camino que sale de la zona inicial de Ana, a 80 unidades de su centro.
+            jungleattack.servidor.mapa.Mapa mapa = new jungleattack.servidor.mapa.Mapa();
+            mapa.generacionMapa();
+            jungleattack.servidor.mapa.Zona origen = mapa.zonaPorIdentificador(
+                    inicio.get(ConstantesProtocolo.CAMPO_ZONA_INICIAL).getAsInt());
+            jungleattack.servidor.mapa.Zona vecina = mapa.zonasConectadas(origen).get(0);
+            double dx = vecina.consultaPosicion().consultaPosicionX() - origen.consultaPosicion().consultaPosicionX();
+            double dy = vecina.consultaPosicion().consultaPosicionY() - origen.consultaPosicion().consultaPosicionY();
+            double largo = Math.hypot(dx, dy);
+            int destinoX = (int) Math.round(origen.consultaPosicion().consultaPosicionX() + dx / largo * 80);
+            int destinoY = (int) Math.round(origen.consultaPosicion().consultaPosicionY() + dy / largo * 80);
+
+            ana.enviar(ConstantesProtocolo.MOVER_ANIMALES, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1",
+                    ConstantesProtocolo.CAMPO_X, String.valueOf(destinoX), ConstantesProtocolo.CAMPO_Y, String.valueOf(destinoY));
+
+            // Llegan actualizaciones con el animal en movimiento y al final lo muestran en el destino.
+            JsonObject enCamino = esperarAnimal(ana, "jaguar-1", animal -> {
+                int x = animal.get(ConstantesProtocolo.CAMPO_X).getAsInt();
+                int y = animal.get(ConstantesProtocolo.CAMPO_Y).getAsInt();
+                return (x != destinoX || y != destinoY) && !(x == origen.consultaPosicion().consultaPosicionX() + 30
+                        && y == origen.consultaPosicion().consultaPosicionY());
+            });
+            assertTrue(enCamino.get(ConstantesProtocolo.CAMPO_ES_PROPIO).getAsBoolean());
+            JsonObject llegada = esperarAnimal(ana, "jaguar-1", animal ->
+                    Math.abs(animal.get(ConstantesProtocolo.CAMPO_X).getAsInt() - destinoX) <= 1
+                            && Math.abs(animal.get(ConstantesProtocolo.CAMPO_Y).getAsInt() - destinoY) <= 1);
+            assertEquals("jaguar", llegada.get(ConstantesProtocolo.CAMPO_ESPECIE).getAsString());
         } finally {
             servidor.cierre();
         }

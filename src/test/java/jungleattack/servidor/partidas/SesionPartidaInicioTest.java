@@ -25,7 +25,7 @@ class SesionPartidaInicioTest {
 
     // Sesión con los dos jugadores ya registrados y con especie elegida (jaguar y tucán), lista para iniciar.
     private SesionPartida sesionLista(long semilla) {
-        SesionPartida sesion = new SesionPartida("AB12", new Random(semilla));
+        SesionPartida sesion = new SesionPartida("AB12", new Random(semilla), false); // false: sin hilos del motor
         Jugador ana = new Jugador("Ana", null);
         Jugador luis = new Jugador("Luis", null);
         sesion.registroJugador(ana);
@@ -221,5 +221,29 @@ class SesionPartidaInicioTest {
         assertEquals("jaguar-1", sesion.animalPorIdentificador("jaguar-1").consultaIdentificador());
         assertEquals("tucan-4", sesion.animalPorIdentificador("tucan-4").consultaIdentificador());
         assertNull(sesion.animalPorIdentificador("dragon-1"));
+    }
+
+    @Test
+    void alIniciarSeCreaElMotorYCancelarLoDetiene() {
+        SesionPartida sesion = sesionLista(1);
+        assertNull(sesion.consultaMotor());
+        sesion.inicio();
+        assertNotNull(sesion.consultaMotor());
+        assertFalse(sesion.consultaMotor().consultaActivo()); // en estas pruebas no arranca hilos
+    }
+
+    @Test
+    void siElMotorEstaActivoArrancaAlIniciarYSeDetieneAlCancelar() {
+        SesionPartida sesion = new SesionPartida("AB12", new Random(1), true);
+        Jugador ana = new Jugador("Ana", null);
+        Jugador luis = new Jugador("Luis", null);
+        sesion.registroJugador(ana);
+        sesion.registroJugador(luis);
+        sesion.eleccionEspecie(ana, Especie.JAGUAR);
+        sesion.eleccionEspecie(luis, Especie.TUCAN);
+        sesion.inicio();
+        assertTrue(sesion.consultaMotor().consultaActivo());
+        sesion.cancelacion("OPONENTE_DESCONECTADO");
+        assertFalse(sesion.consultaMotor().consultaActivo());
     }
 }
