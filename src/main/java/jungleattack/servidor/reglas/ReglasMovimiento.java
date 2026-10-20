@@ -10,6 +10,7 @@ import jungleattack.servidor.modelo.Animal;
 import jungleattack.servidor.modelo.Manada;
 import jungleattack.servidor.partidas.Jugador;
 
+
 //Calcula las rutas y mueve los animales a velocidad constante
 public class ReglasMovimiento {
     private final Mapa mapa;
@@ -78,8 +79,8 @@ public class ReglasMovimiento {
             animal.actualizacionUltimaActualizacion(ahora);
 
             double restante = ConstantesComunes.ANIMAL_SPEED * transcurrido / 1000.0;
-            double x = animal.consultaPosicionPreciseX();
-            double y = animal.consultaPosicionPreciseY();
+            double x = animal.consultaPosicionPrecisaX();
+            double y = animal.consultaPosicionPrecisaY();
             List<Punto> ruta = animal.consultaRuta();
             int indice = animal.consultaIndiceRuta();
             while (restante > 0 && indice < ruta.size()) {

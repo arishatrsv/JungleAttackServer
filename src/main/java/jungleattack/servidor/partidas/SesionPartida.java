@@ -234,7 +234,6 @@ public class SesionPartida {
         manadas.add(manada);
     }
 
-
     public void actualizacion() {
         // TODO: implementar
     }

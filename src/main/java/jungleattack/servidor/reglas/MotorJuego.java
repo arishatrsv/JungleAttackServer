@@ -86,10 +86,6 @@ public class MotorJuego {
         return activo;
     }
 
-    public void actualizacionJuego() {
-        // TODO: implementar
-    }
-
     // Si algo falla al enviar, la tarea programada no debe morir: se ignora ese envío y se intenta en el próximo.
     private void envioProtegido() {
         actualizacionClientes();

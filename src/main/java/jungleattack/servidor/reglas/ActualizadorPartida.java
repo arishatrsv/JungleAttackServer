@@ -103,7 +103,7 @@ public class ActualizadorPartida {
     }
 
     // Envía GAME_STARTED a cada jugador conectado, con su propia versión.
-    public void enviarInicio() {
+    public void envioInicio() {
         for (Jugador jugador : sesion.consultaJugadores()) {
             jugador.envioMensaje(mensajeInicio(jugador));
         }
