@@ -13,6 +13,7 @@ public class Animal extends common.model.Animal {
     private Punto destino;
     private boolean enMovimiento;
     private Animal objetivoAtaque;
+    private Manada manada;
 
     public Animal(String identificador, Especie especie, int energia, Punto posicion) {
         super(identificador, especie, energia, posicion);

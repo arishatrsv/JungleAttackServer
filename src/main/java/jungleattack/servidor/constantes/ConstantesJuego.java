@@ -3,9 +3,9 @@ package jungleattack.servidor.constantes;
 //Constantes de las reglas de la partida. 
 
 public class ConstantesJuego {
-    public static final int ENERGIA_MANADA_JUGADOR = 20;
-    public static final int ENERGIA_ANIMAL = 10;
-    public static final int CANTIDAD_ANIMALES_JUGADOR = 4;
+    public static final int ENERGIA_ANIMAL_JUGADOR = 20;
+    public static final int ENERGIA_ANIMAL_BOTS = 10;
+    public static final int CANTIDAD_ANIMALES_JUGADOR = 10;
     public static final int CANTIDAD_ANIMALES_BOTS = 4;
     public static final int DANIO_JUGADOR = 2;
     public static final int DANIO_BOTS = 1;

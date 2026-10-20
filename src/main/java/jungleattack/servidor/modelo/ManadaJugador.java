@@ -10,7 +10,7 @@ import jungleattack.servidor.mapa.Punto;
 public class ManadaJugador extends Manada {
 
     public ManadaJugador(Especie especie) {
-        super(especie, ConstantesJuego.DANIO_JUGADOR, ConstantesJuego.ENERGIA_MANADA_JUGADOR);
+        super(especie, ConstantesJuego.DANIO_JUGADOR, ConstantesJuego.ENERGIA_ANIMAL_JUGADOR);
     }
 
     @Override
