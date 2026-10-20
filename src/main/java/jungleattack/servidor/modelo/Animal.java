@@ -20,7 +20,6 @@ public class Animal extends common.model.Animal {
     // Instante de la última vez que se actualizó su movimiento. Con él se calcula cuánto avanzó.
     private long ultimaActualizacion;
     private Animal objetivoAtaque;
-    private Manada manada;
 
     public Animal(String identificador, Especie especie, int energia, Punto posicion) {
         super(identificador, especie, energia, posicion);
