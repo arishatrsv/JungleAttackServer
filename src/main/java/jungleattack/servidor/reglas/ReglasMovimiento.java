@@ -23,9 +23,8 @@ public class ReglasMovimiento {
 
     // Ruta por los caminos entre dos puntos (ver BuscadorRutas).
     public List<Punto> calculoRuta(common.model.Punto origen, common.model.Punto destino) {
-        return buscadorRutas.busquedaRuta(origen, destino);
+        return buscadorRutas.busquedaRutaList(origen, destino);
     }
-
     //Revisa que la orden sea válida: el destino debe estar dentro del mapa, y debe haber al menos un animal
     //y todos deben estar vivos y ser de la manada del jugador
     public boolean validarMovimiento(Jugador jugador, List<Animal> animales, common.model.Punto destino) {
