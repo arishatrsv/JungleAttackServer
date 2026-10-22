@@ -1,25 +1,26 @@
 package jungleattack.servidor.modelo;
 
-
 import common.model.Especie;
 import java.util.List;
 import jungleattack.servidor.mapa.Punto;
-import jungleattack.servidor.mapa.Zona;
 
 //Animal individual dentro de una partida. Hereda (identificador,energia,vida,posicion y especie)
 public class Animal extends common.model.Animal {
     //Manada a la que pertenece. De ella sale el daño que causa y la energía máxima que puede tener.
     private Manada manada;
-    // Camino que está recorriendo. El primer punto es donde estaba al recibir la orden; avanza hacia ruta
+    //Camino que está recorriendo. El primer punto es donde estaba al recibir la orden; avanza hacia ruta
     private List<Punto> ruta = List.of();
     private int indiceRuta;
     private boolean enMovimiento;
-    // Posición con decimales.
+    //Posición con decimales.
     private double posicionPreciseX;
     private double posicionPreciseY;
-    // Instante de la última vez que se actualizó su movimiento. Con él se calcula cuánto avanzó.
+    //Instante de la última vez que se actualizó su movimiento. Con él se calcula cuánto avanzó.
     private long ultimaActualizacion;
+    //A quién está atacando por orden del jugador. Los bots eligen su objetivo solos en cada ciclo.
     private Animal objetivoAtaque;
+    //Instante del último ataque que hizo. Empieza muy atrás para que el primer ataque sea inmediato.
+    private long ultimoAtaque = Long.MIN_VALUE / 2;
 
     public Animal(String identificador, Especie especie, int energia, Punto posicion) {
         super(identificador, especie, energia, posicion);
@@ -95,15 +96,44 @@ public class Animal extends common.model.Animal {
         this.ultimaActualizacion = ultimaActualizacion;
     }
 
-    public void recepcionDanio(int cantidad) {
+    //Resta energía. La energía nunca baja de 0, y con 0 el animal muere
+    //Es synchronized porque varios atacantes, de hilos distintos, pueden herir al mismo animal a la vez.
+    public synchronized boolean recepcionDanio(int cantidad) {
+        boolean estabaVivo = consultaVida();
+        actualizacionEnergia(consultaEnergia() - cantidad);
+        if (estabaVivo && !consultaVida()) {
+            muerte();
+            return true; //solo si ESTE golpe fue el que lo mató, para que la eliminación se cuente una sola vez
+        }
+        return false;
     }
 
-    public void muerte() {
+    //Lo que le pasa a un animal al morir: deja de moverse y de atacar.
+    public synchronized void muerte() {
+        limpiezaRuta();
+        objetivoAtaque = null;
     }
 
-    public void ordenAtaque(Animal objetivo) {
+    //Revisa si el animal puede atacar ahora y, si puede, anota este instante como su último ataque. 
+    //Revisa y anota es una sola operación para que dos hilos
+    //no lo hagan atacar dos veces en el mismo instante
+    public synchronized boolean intentoAtaque(long ahora, int enfriamiento) {
+        if (ahora - ultimoAtaque < enfriamiento) {
+            return false;
+        }
+        ultimoAtaque = ahora;
+        return true;
     }
 
-    public void detencionAtaque() {
+    public synchronized void ordenAtaque(Animal objetivo) {
+        this.objetivoAtaque = objetivo;
+    }
+
+    public synchronized void detencionAtaque() {
+        this.objetivoAtaque = null;
+    }
+
+    public synchronized Animal consultaObjetivoAtaque() {
+        return objetivoAtaque;
     }
 }

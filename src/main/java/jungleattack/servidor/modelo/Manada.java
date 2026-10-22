@@ -9,8 +9,8 @@ import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Punto;
 
 
-// Grupo de animales de una misma especie. Manada por especie: dos son de los jugadores, guarda lo que cpomparten 
-// todos los animales y los otros 5 son bots. El ataque lo hace cada animal, no la manada
+//Grupo de animales de una misma especie. Manada por especie: dos son de los jugadores, guarda lo que cpomparten 
+//todos los animales y los otros 5 son bots. El ataque lo hace cada animal, no la manada
 public abstract class Manada {
     private final Especie especie;
     private final List<Animal> animales = new ArrayList<>();
@@ -72,6 +72,11 @@ public abstract class Manada {
         return null;
     }
 
+    // Cuántos animales de la manada han muerto (para el resumen del final).
+    public int cantidadAnimalesMuertos() {
+        return animales.size() - cantidadAnimalesVivos();
+    }
+    
     public int cantidadAnimalesVivos() {
         return animalesVivos().size();
     }

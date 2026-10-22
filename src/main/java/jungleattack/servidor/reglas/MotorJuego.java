@@ -8,9 +8,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
+
 import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Zona;
 import jungleattack.servidor.modelo.Animal;
+import jungleattack.servidor.modelo.EventoCombate;
 import jungleattack.servidor.partidas.Jugador;
 import jungleattack.servidor.partidas.SesionPartida;
 import jungleattack.servidor.protocolo.Mensaje;
@@ -29,6 +31,8 @@ public class MotorJuego {
     private ScheduledExecutorService difusion;
     // Último contenido de STATE_UPDATE enviado a cada jugador. Sirve para no repetir mensajes iguales.
     private final Map<Jugador, String> ultimoEstadoEnviado = new ConcurrentHashMap<>();
+    //Hasta qué evento de combate (número de secuencia) ya se revisó para cada jugador.
+    private final Map<Jugador, Long> ultimoEventoVisto = new ConcurrentHashMap<>();
     private volatile boolean activo;
 
     //Debe crearse después de que la sesión tenga su mapa(cuando la partida inicia)
@@ -38,7 +42,8 @@ public class MotorJuego {
         this.reglasMovimiento = new ReglasMovimiento(sesion.consultaMapa());
         this.actualizador = new ActualizadorPartida(sesion);
         for (Zona zona : sesion.consultaMapa().consultaZonas()) {
-            hilosZona.add(new HiloZona(zona, sesion.consultaMapa(), reglasMovimiento, reloj, this::alMoverseUnAnimal));
+            hilosZona.add(new HiloZona(zona, sesion.consultaMapa(), reglasMovimiento, reloj, this::alMoverseUnAnimal,
+                    reglasCombate::actualizacionAtaques));
         }
     }
     //Arranca los hilos: uno por zona y el que envía las actualizaciones. Todos son daemon, así que no
@@ -51,6 +56,7 @@ public class MotorJuego {
         // Lo que ya vieron los jugadores en GAME_STARTED no hace falta volver a enviarlo.
         for (Jugador jugador : sesion.consultaJugadores()) {
             ultimoEstadoEnviado.put(jugador, actualizador.mensajeEstado(jugador).consultaContenido());
+            ultimoEventoVisto.put(jugador, registroEventos.ultimaSecuencia());
         }
         for (HiloZona hiloZona : hilosZona) {
             Thread hilo = new Thread(hiloZona, ConstantesJuego.PREFIJO_HILO_ZONA + sesion.consultaCodigo());
@@ -123,27 +129,81 @@ public class MotorJuego {
         return true;
     }
 
-    public void ejecucionOrdenAtaque(Jugador jugador, List<Animal> animales, Animal objetivo) {
-        // TODO: implementar
+    //Ejecuta una orden de ataque, los animales dados atacan al objetivo mientras este siga vivo y al alcance.
+    public int ejecucionOrdenAtaque(Jugador jugador, List<Animal> animales, Animal objetivo) {
+        if (jugador.consultaManada() == null || objetivo.consultaManada() == jugador.consultaManada()
+                || !objetivo.consultaVida() || !objetivoVisible(jugador, objetivo)) {
+            return -1;
+        }
+        int atacando = 0;
+        for (Animal atacante : animales) {
+            if (atacante.consultaManada() == jugador.consultaManada() && atacante.consultaVida()
+                    && reglasCombate.comprobacionAlcance(atacante, objetivo)) {
+                atacante.ordenAtaque(objetivo);
+                atacando++;
+            }
+        }
+        return atacando;
+    }
+
+    // El jugador solo puede atacar animales que estén en alguna de las zonas que ve.
+    private boolean objetivoVisible(Jugador jugador, Animal objetivo) {
+        Zona zonaObjetivo = sesion.consultaMapa().zonaPorPosicion(objetivo.consultaPosicion());
+        return zonaObjetivo != null && actualizador.zonasVisibles(jugador).contains(zonaObjetivo);
     }
 
     public boolean comprobacionVictoria() {
         // TODO: implementar
         return false;
     }
+
     //Envía a cada jugador su STATE_UPDATE, solo si lo que ve cambió desde el último envío
     public void actualizacionClientes() {
         for (Jugador jugador : sesion.consultaJugadores()) {
-            Mensaje estado = actualizador.mensajeEstado(jugador);
-            String anterior = ultimoEstadoEnviado.put(jugador, estado.consultaContenido());
-            if (!estado.consultaContenido().equals(anterior)) {
-                envioEstado(jugador, estado);
+            // La foto sin eventos sirve para saber si algo cambió; los eventos nuevos se envían aunque nada más cambie.
+            String contenido = actualizador.mensajeEstado(jugador).consultaContenido();
+            List<EventoCombate> eventos = eventosParaElJugador(jugador);
+            String anterior = ultimoEstadoEnviado.put(jugador, contenido);
+            if (!contenido.equals(anterior) || !eventos.isEmpty()) {
+                envioEstado(jugador, actualizador.mensajeEstado(jugador, eventos));
             }
         }
     }
+
+    //Los eventos de combate que ocurrieron desde la última vez y que el jugador debe ver, las zonas
+    //que ve ahora. Cada evento se le entrega una sola vez.
+    private List<EventoCombate> eventosParaElJugador(Jugador jugador) {
+        long desde = ultimoEventoVisto.getOrDefault(jugador, 0L);
+        long hasta = registroEventos.ultimaSecuencia();
+        List<EventoCombate> relevantes = new ArrayList<>();
+        if (hasta <= desde) {
+            return relevantes;
+        }
+        List<Zona> visibles = actualizador.zonasVisibles(jugador);
+        for (EventoCombate evento : registroEventos.desde(desde)) {
+            for (Zona zona : visibles) {
+                if (zona.consultaIdentificador() == evento.consultaZonaAtacante()
+                        || zona.consultaIdentificador() == evento.consultaZonaObjetivo()) {
+                    relevantes.add(evento);
+                    break;
+                }
+            }
+        }
+        ultimoEventoVisto.put(jugador, hasta);
+        return relevantes;
+    }
+
     // Entrega el mensaje al jugador. Es un método aparte para que las pruebas puedan registrar qué se envía.
     protected void envioEstado(Jugador jugador, Mensaje estado) {
         jugador.envioMensaje(estado);
+    }
+
+    public ReglasCombate consultaReglasCombate() {
+        return reglasCombate;
+    }
+
+    public RegistroEventos consultaRegistroEventos() {
+        return registroEventos;
     }
 
     public ReglasMovimiento consultaReglasMovimiento() {

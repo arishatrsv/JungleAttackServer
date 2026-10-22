@@ -2,6 +2,7 @@ package jungleattack.servidor.reglas;
 
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import java.util.function.ObjLongConsumer;
 import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Mapa;
 import jungleattack.servidor.mapa.Zona;
@@ -15,8 +16,10 @@ public class HiloZona implements Runnable {
     private final Mapa mapa;
     private final ReglasMovimiento reglasMovimiento;
     private final LongSupplier reloj;
-    // Qué hacer después de mover a un animal (por ejemplo, revisar si tocó una taza). Lo define el motor.
+    //Qué hacer después de mover a un animal (por ejemplo, revisar si tocó una taza). Lo define el motor.
     private final Consumer<Animal> alMoverse;
+    //Qué hacer con cada animal vivo en cada ciclo, se haya movido o no (por ejemplo, los ataques). Recibe el instante actual.
+    private final ObjLongConsumer<Animal> alActualizar;
     private volatile boolean activo = true;
 
     public HiloZona(Zona zona, Mapa mapa, ReglasMovimiento reglasMovimiento, LongSupplier reloj) {
@@ -24,11 +27,17 @@ public class HiloZona implements Runnable {
     }
 
     public HiloZona(Zona zona, Mapa mapa, ReglasMovimiento reglasMovimiento, LongSupplier reloj, Consumer<Animal> alMoverse) {
+        this(zona, mapa, reglasMovimiento, reloj, alMoverse, (animal, ahora) -> { });
+    }
+
+    public HiloZona(Zona zona, Mapa mapa, ReglasMovimiento reglasMovimiento, LongSupplier reloj, Consumer<Animal> alMoverse,
+            ObjLongConsumer<Animal> alActualizar) {
         this.zona = zona;
         this.mapa = mapa;
         this.reglasMovimiento = reglasMovimiento;
         this.reloj = reloj;
         this.alMoverse = alMoverse;
+        this.alActualizar = alActualizar;
     }
 
     @Override

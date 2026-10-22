@@ -3,7 +3,10 @@ package jungleattack.servidor.modelo;
 import common.model.Especie;
 import jungleattack.servidor.mapa.Punto;
 
+//Animal controlado por el servidor. 
+//Ataca automáticamente a los animales de los jugadores que se le acercan
 public class AnimalBot extends Animal {
+
     public AnimalBot(String identificador, Especie especie, int energia, Punto posicion) {
         super(identificador, especie, energia, posicion);
     }
@@ -13,11 +16,4 @@ public class AnimalBot extends Animal {
         return true;
     }
 
-    public Animal seleccionObjetivo() {
-        return null;
-    }
-
-    public void ataqueAutomatico() {
-        // TODO: implementar
-    }
 }

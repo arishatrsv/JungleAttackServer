@@ -1,6 +1,7 @@
 package jungleattack.servidor.reglas;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import common.constantes.ConstantesProtocolo;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.Map;
 import jungleattack.servidor.mapa.Zona;
 import jungleattack.servidor.modelo.Animal;
 import jungleattack.servidor.modelo.Bandera;
+import jungleattack.servidor.modelo.EventoCombate;
 import jungleattack.servidor.modelo.Manada;
 import jungleattack.servidor.modelo.Taza;
 import jungleattack.servidor.partidas.Jugador;
@@ -59,6 +61,33 @@ public class ActualizadorPartida {
         return ConversorMensajes.creacionMensajeConContenido(ConstantesProtocolo.ACTUALIZACION_ESTADO, mostrarFoto(jugador));
     }
 
+    //El STATE_UPDATE de un jugador con los eventos de combate recientes (ataques y muertes), para que el cliente
+    //muestre los efectos.
+    public Mensaje mensajeEstado(Jugador jugador, List<EventoCombate> eventos) {
+        JsonObject contenido = mostrarFoto(jugador);
+        JsonArray lista = new JsonArray();
+        for (EventoCombate evento : eventos) {
+            lista.add(datosEvento(evento));
+        }
+        contenido.add(ConstantesProtocolo.CAMPO_EVENTOS, lista);
+        return ConversorMensajes.creacionMensajeConContenido(ConstantesProtocolo.ACTUALIZACION_ESTADO, contenido);
+    }
+
+    private JsonObject datosEvento(EventoCombate evento) {
+        JsonObject datos = new JsonObject();
+        datos.addProperty(ConstantesProtocolo.CAMPO_TIPO_EVENTO,
+                evento.consultaTipo() == EventoCombate.Tipo.ATAQUE ? ConstantesProtocolo.EVENTO_ATAQUE : ConstantesProtocolo.EVENTO_MUERTE);
+        if (evento.consultaAtacante() != null) {
+            datos.addProperty(ConstantesProtocolo.CAMPO_ATACANTE, evento.consultaAtacante());
+        }
+        datos.addProperty(ConstantesProtocolo.CAMPO_OBJETIVO, evento.consultaObjetivo());
+        datos.addProperty(ConstantesProtocolo.CAMPO_ESPECIE, evento.consultaEspecie());
+        datos.addProperty(ConstantesProtocolo.CAMPO_DANIO, evento.consultaDanio());
+        datos.addProperty(ConstantesProtocolo.CAMPO_X, evento.consultaX());
+        datos.addProperty(ConstantesProtocolo.CAMPO_Y, evento.consultaY());
+        return datos;
+    }
+
     //La foto de lo que el jugador ve. 
     private JsonObject mostrarFoto(Jugador jugador) {
         Manada manada = jugador.consultaManada();
@@ -66,6 +95,7 @@ public class ActualizadorPartida {
         JsonObject contenido = new JsonObject();
         contenido.addProperty(ConstantesProtocolo.CAMPO_DANIO, manada.consultaDanio());
         contenido.addProperty(ConstantesProtocolo.CAMPO_TAZAS_CONSUMIDAS, jugador.consultaManada().consultaTazasConsumidas());
+        contenido.addProperty(ConstantesProtocolo.CAMPO_BOTS_ELIMINADOS, jugador.consultaManada().consultaBotsEliminados());
 
         JsonArray identificadoresZonas = new JsonArray();
         Map<String, JsonObject> animalesPorId = new LinkedHashMap<>();
