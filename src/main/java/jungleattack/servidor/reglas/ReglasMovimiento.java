@@ -25,6 +25,7 @@ public class ReglasMovimiento {
     public List<Punto> calculoRuta(common.model.Punto origen, common.model.Punto destino) {
         return buscadorRutas.busquedaRutaList(origen, destino);
     }
+
     //Revisa que la orden sea válida: el destino debe estar dentro del mapa, y debe haber al menos un animal
     //y todos deben estar vivos y ser de la manada del jugador
     public boolean validarMovimiento(Jugador jugador, List<Animal> animales, common.model.Punto destino) {
@@ -46,6 +47,9 @@ public class ReglasMovimiento {
 
     //Le da al animal la ruta hasta el destino.  Si se mueven varios animales a la vez, cada uno termina en un
     //lugar distinto
+    //ahora   instante actual en milisegundos
+    //indice  número de este animal dentro del grupo que se mueve (0, 1, 2...)
+    //total   cantidad de animales del grupo
     public void inicioMovimiento(Animal animal, common.model.Punto destino, long ahora, int indice, int total) {
         synchronized (animal) {
             List<Punto> ruta = new ArrayList<>(calculoRuta(animal.consultaPosicion(), destino));
@@ -105,7 +109,8 @@ public class ReglasMovimiento {
             return true;
         }
     }
-    // El animal llegó: borra su ruta.
+
+    //El animal llegó, borra su ruta.
     public void finalizacionMovimiento(Animal animal) {
         synchronized (animal) {
             animal.limpiezaRuta();

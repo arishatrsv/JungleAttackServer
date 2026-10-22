@@ -9,7 +9,6 @@ import jungleattack.servidor.mapa.Camino;
 import jungleattack.servidor.mapa.Mapa;
 import jungleattack.servidor.mapa.Punto;
 import jungleattack.servidor.modelo.Animal;
-import jungleattack.servidor.modelo.Manada;
 import jungleattack.servidor.modelo.ManadaJugador;
 import jungleattack.servidor.modelo.Taza;
 
@@ -27,6 +26,7 @@ public class ReglasObjetos {
         }
         return tazas;
     }
+
     // Elige un punto del camino que quede al menos a la distancia minima de sus dos extremos.
     private double fraccionAleatoria(Camino camino, Random aleatorio) {
         double margen = ConstantesJuego.DISTANCIA_MINIMA_TAZA_ZONA / camino.consultaLongitud();
@@ -78,6 +78,13 @@ public class ReglasObjetos {
         return consumidas; //cuántas tazas consumió el animal en esta revisión
     }
 
-    public void recuperacionPorEliminaciones(Manada manada) {
+    //Cada 2 bots eliminados, todos los animales vivos de la manada ganan 1 de energía,
+    //Se llama cada vez que la manada elimina un bot
+    public boolean recuperacionPorEliminaciones(ManadaJugador manada, int totalEliminados) {
+        if (totalEliminados <= 0 || totalEliminados % ConstantesJuego.ELIMINACIONES_POR_ENERGIA != 0) {
+            return false;
+        }
+        manada.recuperacionEnergia();
+        return true;
     }
 }

@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonObject;
 import common.constantes.ConstantesProtocolo;
 import common.model.Especie;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -14,6 +16,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import jungleattack.servidor.mapa.Punto;
 import jungleattack.servidor.mapa.Zona;
 import jungleattack.servidor.modelo.Animal;
+import jungleattack.servidor.modelo.AnimalBot;
+import jungleattack.servidor.modelo.ManadaBots;
 import jungleattack.servidor.modelo.Taza;
 import jungleattack.servidor.partidas.Jugador;
 import jungleattack.servidor.partidas.SesionPartida;
@@ -272,5 +276,236 @@ class MotorJuegoTest {
         SesionPartida sesion = partida();
         avanzar(sesion, 20000);
         assertEquals(0, tazasConsumidasEnLaPartida(sesion));
+    }
+
+    // ----- Combate -----
+
+    // Motor que además guarda los mensajes que enviaría, para revisar qué recibe cada jugador.
+    private static class MotorQueGuarda extends MotorJuego {
+        private final List<Jugador> destinatarios = new ArrayList<>();
+        private final List<Mensaje> mensajes = new ArrayList<>();
+
+        MotorQueGuarda(SesionPartida sesion, java.util.function.LongSupplier reloj) {
+            super(sesion, reloj);
+        }
+
+        @Override
+        protected void envioEstado(Jugador jugador, Mensaje estado) {
+            destinatarios.add(jugador);
+            mensajes.add(estado);
+        }
+
+        List<Mensaje> mensajesDe(Jugador jugador) {
+            List<Mensaje> suyos = new ArrayList<>();
+            for (int i = 0; i < mensajes.size(); i++) {
+                if (destinatarios.get(i) == jugador) {
+                    suyos.add(mensajes.get(i));
+                }
+            }
+            return suyos;
+        }
+    }
+
+    private void avanzar(MotorJuego motor, long milisegundos) {
+        long fin = reloj.get() + milisegundos;
+        while (reloj.get() < fin) {
+            reloj.addAndGet(50);
+            motor.actualizacionJuego();
+        }
+    }
+
+    // La primera manada de bots de la partida.
+    private ManadaBots botsDe(SesionPartida sesion) {
+        return (ManadaBots) sesion.consultaManadas().stream().filter(m -> m instanceof ManadaBots).findFirst().get();
+    }
+
+    // Pone al animal en un punto del mapa, como si hubiera llegado caminando hasta ahí.
+    private void colocar(SesionPartida sesion, Animal animal, int x, int y) {
+        animal.actualizacionPosicion(new Punto(x, y));
+        sesion.consultaMapa().actualizacionUbicacionAnimal(animal);
+    }
+
+    private Punto centroDeLaZonaDe(SesionPartida sesion, Animal animal) {
+        return centro(sesion.consultaMapa().zonaPorPosicion(animal.consultaPosicion()));
+    }
+
+    @Test
+    void unBotAtacaSoloAlAnimalQueSeLeAcerca() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Animal visitante = ana.consultaManada().consultaAnimales().get(0);
+        Punto centroBots = centroDeLaZonaDe(sesion, botsDe(sesion).consultaAnimales().get(0));
+
+        avanzar(sesion, 2000);
+        assertEquals(20, visitante.consultaEnergia()); // lejos de los bots no pasa nada
+
+        colocar(sesion, visitante, centroBots.consultaPosicionX(), centroBots.consultaPosicionY());
+        avanzar(sesion, 50);
+        assertEquals(16, visitante.consultaEnergia()); // los 4 bots atacan en cuanto lo tienen al alcance
+        avanzar(sesion, 1000);
+        assertEquals(12, visitante.consultaEnergia()); // y siguen una vez por segundo
+    }
+
+    @Test
+    void siUnAnimalMuereDejaDeVerseYSeCuentaComoPerdido() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        ActualizadorPartida actualizador = new ActualizadorPartida(sesion);
+        Animal debil = ana.consultaManada().consultaAnimales().get(0);
+        debil.actualizacionEnergia(3);
+        Punto centroBots = centroDeLaZonaDe(sesion, botsDe(sesion).consultaAnimales().get(0));
+
+        colocar(sesion, debil, centroBots.consultaPosicionX(), centroBots.consultaPosicionY());
+        avanzar(sesion, 50);
+
+        assertFalse(debil.consultaVida());
+        assertEquals(1, ana.consultaManada().cantidadAnimalesMuertos());
+        JsonArray animales = ConversorMensajes.contenidoComoObjeto(actualizador.mensajeEstado(ana)).getAsJsonArray(ConstantesProtocolo.CAMPO_ANIMALES);
+        for (JsonElement animal : animales) {
+            assertFalse(debil.consultaIdentificador().equals(animal.getAsJsonObject().get(ConstantesProtocolo.CAMPO_ID).getAsString()));
+        }
+    }
+
+    @Test
+    void unaOrdenDeAtaqueEliminaBotsYSeCuentan() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        ManadaBots bots = botsDe(sesion);
+        Punto centroBots = centroDeLaZonaDe(sesion, bots.consultaAnimales().get(0));
+        for (Animal animal : ana.consultaManada().consultaAnimales()) {
+            colocar(sesion, animal, centroBots.consultaPosicionX(), centroBots.consultaPosicionY());
+        }
+
+        MotorJuego motor = sesion.consultaMotor();
+        assertEquals(10, motor.ejecucionOrdenAtaque(ana, ana.consultaManada().consultaAnimales(), bots.consultaAnimales().get(0)));
+        avanzar(sesion, 50); // 10 atacantes x 2 de daño: el bot (10 de energía) muere en el primer ciclo
+        assertFalse(bots.consultaAnimales().get(0).consultaVida());
+        assertEquals(1, ana.consultaManada().consultaBotsEliminados());
+
+        assertEquals(10, motor.ejecucionOrdenAtaque(ana, ana.consultaManada().consultaAnimales(), bots.consultaAnimales().get(1)));
+        avanzar(sesion, 1000);
+        assertFalse(bots.consultaAnimales().get(1).consultaVida());
+        assertEquals(2, ana.consultaManada().consultaBotsEliminados());
+    }
+
+    @Test
+    void lasOrdenesDeAtaqueInvalidasSeRechazan() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Jugador luis = sesion.consultaJugadores().get(1);
+        ManadaBots bots = botsDe(sesion);
+        MotorJuego motor = sesion.consultaMotor();
+        List<Animal> mios = ana.consultaManada().consultaAnimales();
+
+        assertEquals(-1, motor.ejecucionOrdenAtaque(ana, mios, mios.get(1))); // un animal propio
+        assertEquals(-1, motor.ejecucionOrdenAtaque(ana, mios, luis.consultaManada().consultaAnimales().get(0))); // zona que no se ve
+        assertEquals(-1, motor.ejecucionOrdenAtaque(ana, mios, bots.consultaAnimales().get(0))); // zona que no se ve
+        Animal muerto = bots.consultaAnimales().get(0);
+        muerto.recepcionDanio(100);
+        assertEquals(-1, motor.ejecucionOrdenAtaque(ana, mios, muerto)); // ya murió
+    }
+
+    @Test
+    void losAtacantesFueraDeAlcanceIgnoranLaOrden() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        ManadaBots bots = botsDe(sesion);
+        Punto centroBots = centroDeLaZonaDe(sesion, bots.consultaAnimales().get(0));
+        Animal cerca = ana.consultaManada().consultaAnimales().get(0);
+        Animal lejos = ana.consultaManada().consultaAnimales().get(1);
+        colocar(sesion, cerca, centroBots.consultaPosicionX(), centroBots.consultaPosicionY());
+        Animal objetivo = bots.consultaAnimales().get(0);
+        // El otro animal se queda en la misma zona pero a más de 40 unidades del objetivo.
+        int xLejos = objetivo.consultaPosicion().consultaPosicionX() + 90;
+        colocar(sesion, lejos, xLejos, objetivo.consultaPosicion().consultaPosicionY());
+
+        MotorJuego motor = sesion.consultaMotor();
+        assertEquals(0, motor.ejecucionOrdenAtaque(ana, List.of(lejos), objetivo));
+        assertEquals(1, motor.ejecucionOrdenAtaque(ana, List.of(cerca, lejos), objetivo));
+    }
+
+    @Test
+    void moverAUnAnimalQueAtacabaDetieneElAtaque() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        ManadaBots bots = botsDe(sesion);
+        Punto centroBots = centroDeLaZonaDe(sesion, bots.consultaAnimales().get(0));
+        Animal atacante = ana.consultaManada().consultaAnimales().get(0);
+        colocar(sesion, atacante, centroBots.consultaPosicionX(), centroBots.consultaPosicionY());
+        sesion.consultaMotor().ejecucionOrdenAtaque(ana, List.of(atacante), bots.consultaAnimales().get(0));
+        assertTrue(atacante.consultaObjetivoAtaque() != null);
+
+        sesion.consultaMotor().ejecucionOrdenMovimiento(ana, List.of(atacante), new Punto(centroBots.consultaPosicionX() + 50, centroBots.consultaPosicionY()));
+        assertEquals(null, atacante.consultaObjetivoAtaque());
+    }
+
+    @Test
+    void losEventosDelCombateLlegaSoloAQuienVeLaZonaYUnaSolaVez() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Jugador luis = sesion.consultaJugadores().get(1);
+        MotorQueGuarda motor = new MotorQueGuarda(sesion, reloj::get);
+        Animal visitante = ana.consultaManada().consultaAnimales().get(0);
+        Punto centroBots = centroDeLaZonaDe(sesion, botsDe(sesion).consultaAnimales().get(0));
+
+        motor.actualizacionClientes(); // la primera vez los dos reciben su foto inicial: se parte de ahí
+        int mensajesAna = motor.mensajesDe(ana).size();
+        int mensajesLuis = motor.mensajesDe(luis).size();
+        colocar(sesion, visitante, centroBots.consultaPosicionX(), centroBots.consultaPosicionY());
+
+        avanzar(motor, 50);
+
+        List<Mensaje> deAna = motor.mensajesDe(ana);
+        assertEquals(mensajesAna + 1, deAna.size());
+        JsonArray eventos = ConversorMensajes.contenidoComoObjeto(deAna.get(deAna.size() - 1)).getAsJsonArray(ConstantesProtocolo.CAMPO_EVENTOS);
+        assertEquals(4, eventos.size()); // los 4 bots atacaron
+        for (JsonElement elemento : eventos) {
+            JsonObject evento = elemento.getAsJsonObject();
+            assertEquals(ConstantesProtocolo.EVENTO_ATAQUE, evento.get(ConstantesProtocolo.CAMPO_TIPO_EVENTO).getAsString());
+            assertEquals(visitante.consultaIdentificador(), evento.get(ConstantesProtocolo.CAMPO_OBJETIVO).getAsString());
+            assertEquals(1, evento.get(ConstantesProtocolo.CAMPO_DANIO).getAsInt());
+        }
+        assertEquals(mensajesLuis, motor.mensajesDe(luis).size()); // a Luis no le llegó nada nuevo: no ve esa zona
+
+        // Sin nada nuevo no se repite lo ya enviado.
+        int antes = motor.mensajesDe(ana).size();
+        avanzar(motor, 500);
+        assertEquals(antes, motor.mensajesDe(ana).size());
+    }
+
+    @Test
+    void laFotoIncluyeLosBotsEliminadosDelJugador() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        ActualizadorPartida actualizador = new ActualizadorPartida(sesion);
+        assertEquals(0, ConversorMensajes.contenidoComoObjeto(actualizador.mensajeEstado(ana))
+                .get(ConstantesProtocolo.CAMPO_BOTS_ELIMINADOS).getAsInt());
+        ana.consultaManada().registroBotEliminado();
+        assertEquals(1, ConversorMensajes.contenidoComoObjeto(actualizador.mensajeEstado(ana))
+                .get(ConstantesProtocolo.CAMPO_BOTS_ELIMINADOS).getAsInt());
+    }
+
+    @Test
+    void unaMuerteSeAvisaComoEventoDeMuerte() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        MotorQueGuarda motor = new MotorQueGuarda(sesion, reloj::get);
+        ManadaBots bots = botsDe(sesion);
+        AnimalBot victima = (AnimalBot) bots.consultaAnimales().get(0);
+        Punto centroBots = centroDeLaZonaDe(sesion, victima);
+        for (Animal animal : ana.consultaManada().consultaAnimales()) {
+            colocar(sesion, animal, centroBots.consultaPosicionX(), centroBots.consultaPosicionY());
+        }
+        motor.ejecucionOrdenAtaque(ana, ana.consultaManada().consultaAnimales(), victima);
+        avanzar(motor, 50);
+
+        boolean hayMuerte = false;
+        for (Mensaje mensaje : motor.mensajesDe(ana)) {
+            for (JsonElement evento : ConversorMensajes.contenidoComoObjeto(mensaje).getAsJsonArray(ConstantesProtocolo.CAMPO_EVENTOS)) {
+                hayMuerte |= ConstantesProtocolo.EVENTO_MUERTE.equals(
+                        evento.getAsJsonObject().get(ConstantesProtocolo.CAMPO_TIPO_EVENTO).getAsString());
+            }
+        }
+        assertTrue(hayMuerte);
     }
 }

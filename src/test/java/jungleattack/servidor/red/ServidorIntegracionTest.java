@@ -390,4 +390,48 @@ class ServidorIntegracionTest {
             servidor.cierre();
         }
     }
+
+    @Test
+    void atacarAntesDeEmpezarLaPartidaDaFaseIncorrecta() throws Exception {
+        int[] puerto = new int[1];
+        ServidorSockets servidor = arrancarServidor(puerto);
+        try (ClientePrueba ana = new ClientePrueba(puerto[0])) {
+            ana.enviar(ConstantesProtocolo.CREAR_PARTIDA, ConstantesProtocolo.CAMPO_APODO, "Ana");
+            ana.leer(); // MATCH_CREATED
+            ana.enviar(ConstantesProtocolo.ATACAR, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1",
+                    ConstantesProtocolo.CAMPO_OBJETIVO, "tucan-1");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_FASE_INCORRECTA);
+        } finally {
+            servidor.cierre();
+        }
+    }
+
+    @Test
+    void lasOrdenesDeAtaqueInvalidasRecibenSuError() throws Exception {
+        int[] puerto = new int[1];
+        ServidorSockets servidor = arrancarServidor(puerto);
+        try (ClientePrueba ana = new ClientePrueba(puerto[0]); ClientePrueba segundoJugador = new ClientePrueba(puerto[0])) {
+            llegarAlInicio(ana, segundoJugador);
+            ana.leer(); // GAME_STARTED
+            segundoJugador.leer(); // GAME_STARTED
+
+            // Un animal que no existe.
+            ana.enviar(ConstantesProtocolo.ATACAR, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1",
+                    ConstantesProtocolo.CAMPO_OBJETIVO, "dragon-9");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_OBJETIVO_INVALIDO);
+            // Un animal propio no se puede atacar.
+            ana.enviar(ConstantesProtocolo.ATACAR, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1",
+                    ConstantesProtocolo.CAMPO_OBJETIVO, "jaguar-2");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_OBJETIVO_INVALIDO);
+            // El animal del oponente existe pero está en una zona que Ana no ve.
+            ana.enviar(ConstantesProtocolo.ATACAR, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1",
+                    ConstantesProtocolo.CAMPO_OBJETIVO, "tucan-1");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_OBJETIVO_INVALIDO);
+            // Falta el objetivo.
+            ana.enviar(ConstantesProtocolo.ATACAR, ConstantesProtocolo.CAMPO_IDS_ANIMALES, "jaguar-1");
+            ana.esperarError(ConstantesProtocolo.MOTIVO_OBJETIVO_INVALIDO);
+        } finally {
+            servidor.cierre();
+        }
+    }
 }
