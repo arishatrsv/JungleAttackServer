@@ -29,7 +29,7 @@ public class Taza {
     }
 
     //Marca la taza como consumida.Solo el primero que lo intente lo logra.
-    public void consumo() {
+    public boolean consumo() {
         return consumida.compareAndSet(false, true); //true si la consumió; false si ya estaba consumida
     }
 }
