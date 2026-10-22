@@ -25,43 +25,56 @@ public class ComandoMoverAnimales implements ComandoCliente {
             return;
         }
 
-        //El destino debe ser dos números
-        Punto destino = new Punto(
-        Integer.parseInt(ConversorMensajes.campoDelContenido(mensaje, ConstantesProtocolo.CAMPO_X).trim()),
-        Integer.parseInt(ConversorMensajes.campoDelContenido(mensaje, ConstantesProtocolo.CAMPO_Y).trim()));
-        
-        //Los animales deben existir y ser de la manada de este jugador. Los que ya murieron se ignoran
-        String identificadores= ConversorMensajes.campoDelContenido(mensaje, ConstantesProtocolo.CAMPO_IDS_ANIMALES);
+        // El destino debe tener dos coordenadas numéricas.
+        String coordenadaX = ConversorMensajes.campoDelContenido(mensaje, ConstantesProtocolo.CAMPO_X);
+        String coordenadaY = ConversorMensajes.campoDelContenido(mensaje, ConstantesProtocolo.CAMPO_Y);
+
+        Punto destino;
+
+        try {
+            if (coordenadaX == null || coordenadaY == null) {
+                enviarError(contexto, ConstantesProtocolo.MOTIVO_MENSAJE_INVALIDO);
+                return;
+            }
+
+            destino = new Punto(
+                    Integer.parseInt(coordenadaX.trim()),
+                    Integer.parseInt(coordenadaY.trim()));
+        } catch (NumberFormatException e) {
+            enviarError(contexto, ConstantesProtocolo.MOTIVO_MENSAJE_INVALIDO);
+            return;
+        }
+        // Los animales deben existir y ser de la manada de este jugador. Los que ya
+        // murieron se ignoran
+        String identificadores = ConversorMensajes.campoDelContenido(mensaje, ConstantesProtocolo.CAMPO_IDS_ANIMALES);
         List<Animal> animales = new ArrayList<>();
-        if (identificadores != null){
-            for(String identificador : identificadores.split(ConstantesProtocolo.SEPARADOR_LISTA)){
-                if (identificador.isBlank()){ // si el identificador está vacio o solo espacios en blanco
+        if (identificadores != null) {
+            for (String identificador : identificadores.split(ConstantesProtocolo.SEPARADOR_LISTA)) {
+                if (identificador.isBlank()) { // si el identificador está vacio o solo espacios en blanco
                     continue;
                 }
-                Animal animal= jugador.ConsultaManada().animalPorIdentificador(identificador.trim());
-                if (animal == null){
-                    enviarError(contexto, ConstantesProtocolo.MOTIVO_ESPECIE_INVALIDA);
+                Animal animal = jugador.consultaManada().animalPorIdentificador(identificador.trim());
+                if (animal == null) {
+                    enviarError(contexto, ConstantesProtocolo.MOTIVO_ANIMAL_INVALIDO);
                     return;
                 }
-                if (animal.consultaVida() && !animales.contains(animal)){
+                if (animal.consultaVida() && !animales.contains(animal)) {
                     animales.add(animal);
                 }
 
             }
         }
-        if (animales.isEmpty()){
-            enviarError(contexto, ConstantesProtocolo.MOTIVO_ESPECIE_INVALIDA);
+        if (animales.isEmpty()) {
+            enviarError(contexto, ConstantesProtocolo.MOTIVO_ANIMAL_INVALIDO);
             return;
         }
-        if (!sesion.ConsultaMotor().ejecucionOrdenMovimiento(jugador, animales, destino)){
+        if (!sesion.consultaMotor().ejecucionOrdenMovimiento(jugador, animales, destino)) {
             enviarError(contexto, ConstantesProtocolo.MOTIVO_DESTINO_INVALIDO);
         }
-    } 
-    
-    private void enviarError(ContextoCliente contexto, String motivo){
-        contexto.envioMensaje(ConversorMensajes.creacionMensaje(
-            ConstantesProtocolo.ERROR, ConstantesProtocolo.CAMPO_MOTIVO, motivo));
     }
-}   
 
-
+    private void enviarError(ContextoCliente contexto, String motivo) {
+        contexto.envioMensaje(ConversorMensajes.creacionMensaje(
+                ConstantesProtocolo.ERROR, ConstantesProtocolo.CAMPO_MOTIVO, motivo));
+    }
+}
