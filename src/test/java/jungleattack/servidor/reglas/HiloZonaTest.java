@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import common.model.Especie;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import jungleattack.servidor.mapa.Mapa;
 import jungleattack.servidor.mapa.Punto;
@@ -85,5 +87,24 @@ class HiloZonaTest {
         hilo.join(2000);
         assertFalse(hilo.isAlive());
         assertTrue(animal.consultaPosicion().consultaPosicionX() < 695, "el animal debió avanzar con el hilo");
+    }
+
+    @Test
+    void despuesDeMoverAUnAnimalSeAplicaElGancho() {
+        Animal animal = animalEnLaZona12();
+        reglas.inicioMovimiento(animal, new Punto(535, 420), 0, 0, 1);
+        List<Animal> movidos = new ArrayList<>();
+        HiloZona hilo = new HiloZona(mapa.zonaPorIdentificador(12), mapa, reglas, reloj::get, movidos::add);
+        hilo.actualizacionZona(500);
+        assertEquals(List.of(animal), movidos);
+    }
+
+    @Test
+    void alUnAnimalQuietoNoSeLeAplicaElGancho() {
+        Animal animal = animalEnLaZona12(); // sin orden de movimiento
+        List<Animal> movidos = new ArrayList<>();
+        HiloZona hilo = new HiloZona(mapa.zonaPorIdentificador(12), mapa, reglas, reloj::get, movidos::add);
+        hilo.actualizacionZona(500);
+        assertTrue(movidos.isEmpty());
     }
 }

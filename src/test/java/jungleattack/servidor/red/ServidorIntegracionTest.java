@@ -374,6 +374,7 @@ class ServidorIntegracionTest {
                     ConstantesProtocolo.CAMPO_X, String.valueOf(destinoX), ConstantesProtocolo.CAMPO_Y, String.valueOf(destinoY));
 
             // Llegan actualizaciones con el animal en movimiento y al final lo muestran en el destino.
+            assertEquals(0, inicio.get(ConstantesProtocolo.CAMPO_TAZAS_CONSUMIDAS).getAsInt());
             JsonObject enCamino = esperarAnimal(ana, "jaguar-1", animal -> {
                 int x = animal.get(ConstantesProtocolo.CAMPO_X).getAsInt();
                 int y = animal.get(ConstantesProtocolo.CAMPO_Y).getAsInt();

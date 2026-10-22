@@ -5,20 +5,24 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import common.model.Especie;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import jungleattack.servidor.mapa.Mapa;
 import jungleattack.servidor.mapa.Punto;
+import jungleattack.servidor.mapa.Zona;
 import jungleattack.servidor.modelo.Animal;
+import jungleattack.servidor.modelo.AnimalBot;
+import jungleattack.servidor.modelo.ManadaBots;
 import jungleattack.servidor.modelo.ManadaJugador;
-import jungleattack.servidor.partidas.Jugador;
+import jungleattack.servidor.modelo.Taza;
 import org.junit.jupiter.api.Test;
 
-class ReglasMovimientoTest {
+class ReglasTazasTest {
 
     private final Mapa mapa = crearMapa();
-    private final ReglasMovimiento reglas = new ReglasMovimiento(mapa);
+    private final ReglasObjetos reglas = new ReglasObjetos();
 
     private static Mapa crearMapa() {
         Mapa mapa = new Mapa();
@@ -26,194 +30,181 @@ class ReglasMovimientoTest {
         return mapa;
     }
 
-    // Un jugador con una manada de n animales ubicados todos en (x, y).
-    private Jugador jugadorConAnimales(int cantidad, int x, int y) {
-        Jugador jugador = new Jugador("Ana", null);
+    // Una manada de jugador con n animales, todos en (x, y).
+    private ManadaJugador manada(int cantidad, int x, int y) {
         ManadaJugador manada = new ManadaJugador(Especie.JAGUAR);
         for (int i = 1; i <= cantidad; i++) {
             manada.incorporacionAnimal(new jungleattack.servidor.modelo.AnimalJugador("jaguar-" + i, Especie.JAGUAR, 20, new Punto(x, y)));
         }
-        jugador.asignacionManada(manada);
-        return jugador;
+        return manada;
     }
 
-    private Animal primerAnimal(Jugador jugador) {
-        return jugador.consultaManada().consultaAnimales().get(0);
+    // Una taza sobre el camino que une las zonas 11 y 12, registrada en su zona.
+    private Taza taza(String id, int x, int y) {
+        Taza taza = new Taza(id, new Punto(x, y));
+        mapa.zonaPorPosicion(taza.consultaPosicion()).registroTaza(taza);
+        return taza;
     }
 
-    private void assertPosicion(int x, int y, Animal animal) {
-        assertEquals(x, animal.consultaPosicion().consultaPosicionX(), "x");
-        assertEquals(y, animal.consultaPosicion().consultaPosicionY(), "y");
+    // ----- La taza -----
+
+    @Test
+    void unaTazaSoloSePuedeConsumirUnaVez() {
+        Taza taza = new Taza("taza-1", new Punto(10, 10));
+        assertFalse(taza.consultaConsumida());
+        assertTrue(taza.consumo());
+        assertTrue(taza.consultaConsumida());
+        assertFalse(taza.consumo());
+    }
+
+    // ----- Consumir -----
+
+    @Test
+    void alConsumirUnaTazaElDanioDeTodaLaManadaSubeEnUno() {
+        ManadaJugador manada = manada(3, 600, 420);
+        assertEquals(2, manada.consultaDanio());
+        assertTrue(reglas.consumoTaza(manada.consultaAnimales().get(0), taza("taza-1", 600, 420)));
+        assertEquals(3, manada.consultaDanio()); // el daño es de la manada: lo tienen los 3 animales
+        assertEquals(1, manada.consultaTazasConsumidas());
     }
 
     @Test
-    void elAnimalAvanzaLaVelocidadPorElTiempoTranscurrido() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(animal, new Punto(535, 420), 0, 0, 1); // 160 unidades hacia la izquierda
-        assertTrue(reglas.actualizacionPosicion(animal, 1000)); // 60 unidades por segundo
-        assertPosicion(635, 420, animal);
-        reglas.actualizacionPosicion(animal, 1500);
-        assertPosicion(605, 420, animal);
+    void elDanioPorTazasEsAcumulativo() {
+        ManadaJugador manada = manada(2, 600, 420);
+        reglas.consumoTaza(manada.consultaAnimales().get(0), taza("taza-1", 600, 420));
+        reglas.consumoTaza(manada.consultaAnimales().get(1), taza("taza-2", 620, 420));
+        assertEquals(4, manada.consultaDanio());
+        assertEquals(2, manada.consultaTazasConsumidas());
     }
 
     @Test
-    void laVelocidadNoDependeDeCuantasVecesSeActualiza() {
-        Animal pocas = primerAnimal(jugadorConAnimales(1, 695, 420));
-        Animal muchas = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(pocas, new Punto(535, 420), 0, 0, 1);
-        reglas.inicioMovimiento(muchas, new Punto(535, 420), 0, 0, 1);
-        reglas.actualizacionPosicion(pocas, 2000);
-        for (int t = 50; t <= 2000; t += 50) {
-            reglas.actualizacionPosicion(muchas, t);
+    void unaTazaYaConsumidaNoDaNadaDeNuevo() {
+        ManadaJugador manada = manada(2, 600, 420);
+        Taza taza = taza("taza-1", 600, 420);
+        assertTrue(reglas.consumoTaza(manada.consultaAnimales().get(0), taza));
+        assertFalse(reglas.consumoTaza(manada.consultaAnimales().get(1), taza));
+        assertEquals(3, manada.consultaDanio());
+        assertEquals(1, manada.consultaTazasConsumidas());
+    }
+
+    @Test
+    void unAnimalMuertoNoConsumeTazas() {
+        ManadaJugador manada = manada(1, 600, 420);
+        Animal muerto = manada.consultaAnimales().get(0);
+        muerto.actualizacionEnergia(0);
+        Taza taza = taza("taza-1", 600, 420);
+        assertFalse(reglas.consumoTaza(muerto, taza));
+        assertFalse(taza.consultaConsumida());
+        assertEquals(2, manada.consultaDanio());
+    }
+
+    @Test
+    void losBotsNoConsumenTazas() {
+        ManadaBots bots = new ManadaBots(Especie.TUCAN);
+        Animal bot = new AnimalBot("tucan-1", Especie.TUCAN, 10, new Punto(600, 420));
+        bots.incorporacionAnimal(bot);
+        Taza taza = taza("taza-1", 600, 420);
+        assertFalse(reglas.consumoTaza(bot, taza));
+        assertFalse(taza.consultaConsumida());
+        assertEquals(1, bots.consultaDanio());
+        assertEquals(0, reglas.recogidaTazas(bot, List.of(taza), mapa));
+    }
+
+    @Test
+    void dosAnimalesQueTocanLaMismaTazaAlMismoTiempoSoloLaConsumeUno() throws Exception {
+        for (int vuelta = 0; vuelta < 20; vuelta++) {
+            ManadaJugador manada = manada(8, 600, 420);
+            Taza taza = taza("taza-" + vuelta, 600, 420);
+            CountDownLatch salida = new CountDownLatch(1);
+            AtomicInteger consumos = new AtomicInteger();
+            List<Thread> hilos = new ArrayList<>();
+            for (Animal animal : manada.consultaAnimales()) {
+                Thread hilo = new Thread(() -> {
+                    try {
+                        salida.await();
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                    if (reglas.consumoTaza(animal, taza)) {
+                        consumos.incrementAndGet();
+                    }
+                });
+                hilo.start();
+                hilos.add(hilo);
+            }
+            salida.countDown();
+            for (Thread hilo : hilos) {
+                hilo.join();
+            }
+            assertEquals(1, consumos.get());
+            assertEquals(3, manada.consultaDanio());
+            assertEquals(1, manada.consultaTazasConsumidas());
         }
-        assertEquals(pocas.consultaPosicion().consultaPosicionX(), muchas.consultaPosicion().consultaPosicionX());
-        assertPosicion(575, 420, muchas);
+    }
+
+    // ----- Recoger tazas al moverse -----
+
+    @Test
+    void unAnimalCercaDeUnaTazaLaRecoge() {
+        ManadaJugador manada = manada(1, 600, 420);
+        Taza taza = taza("taza-1", 612, 420); // a 12 unidades: dentro del radio
+        assertEquals(1, reglas.recogidaTazas(manada.consultaAnimales().get(0), List.of(taza), mapa));
+        assertTrue(taza.consultaConsumida());
+        assertEquals(3, manada.consultaDanio());
     }
 
     @Test
-    void unPasoMuyPequenoNoDejaAlAnimalQuieto() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(animal, new Punto(535, 420), 0, 0, 1);
-        for (int t = 5; t <= 1000; t += 5) { // 0,3 unidades por paso: menos que un píxel
-            reglas.actualizacionPosicion(animal, t);
-        }
-        assertPosicion(635, 420, animal);
+    void unAnimalLejosDeUnaTazaNoLaRecoge() {
+        ManadaJugador manada = manada(1, 600, 420);
+        Taza taza = taza("taza-1", 640, 420); // a 40 unidades
+        assertEquals(0, reglas.recogidaTazas(manada.consultaAnimales().get(0), List.of(taza), mapa));
+        assertFalse(taza.consultaConsumida());
+        assertEquals(2, manada.consultaDanio());
     }
 
     @Test
-    void alLlegarSeDetieneYYaNoCambia() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(animal, new Punto(535, 420), 0, 0, 1);
-        assertTrue(animal.consultaEnMovimiento());
-        reglas.actualizacionPosicion(animal, 10000); // mucho más tiempo del necesario
-        assertPosicion(535, 420, animal);
-        assertFalse(animal.consultaEnMovimiento());
-        assertFalse(reglas.actualizacionPosicion(animal, 20000));
-        assertPosicion(535, 420, animal);
+    void elLimiteDelRadioCuentaComoTocar() {
+        ManadaJugador manada = manada(1, 600, 420);
+        Taza justo = taza("taza-1", 615, 420); // exactamente a 15
+        Taza fuera = taza("taza-2", 616, 441); // a más de 15
+        assertEquals(1, reglas.recogidaTazas(manada.consultaAnimales().get(0), List.of(justo, fuera), mapa));
+        assertTrue(justo.consultaConsumida());
+        assertFalse(fuera.consultaConsumida());
     }
 
     @Test
-    void sinTiempoTranscurridoNoSeMueve() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(animal, new Punto(535, 420), 500, 0, 1);
-        assertFalse(reglas.actualizacionPosicion(animal, 500));
-        assertPosicion(695, 420, animal);
+    void unaTazaConsumidaDesapareceDeSuZona() {
+        ManadaJugador manada = manada(1, 600, 420);
+        Taza taza = taza("taza-1", 600, 420);
+        Zona zona = mapa.zonaPorPosicion(taza.consultaPosicion());
+        assertTrue(zona.tazasEnZona().contains(taza));
+        reglas.recogidaTazas(manada.consultaAnimales().get(0), List.of(taza), mapa);
+        assertFalse(zona.tazasEnZona().contains(taza));
     }
 
     @Test
-    void siElAnimalYaEstaEnElDestinoNoSeMueve() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(animal, new Punto(695, 420), 0, 0, 1);
-        assertFalse(animal.consultaEnMovimiento());
+    void unAnimalPuedeRecogerVariasTazasEnUnaMismaRevision() {
+        ManadaJugador manada = manada(1, 600, 420);
+        List<Taza> tazas = List.of(taza("taza-1", 600, 425), taza("taza-2", 605, 420), taza("taza-3", 700, 420));
+        assertEquals(2, reglas.recogidaTazas(manada.consultaAnimales().get(0), tazas, mapa));
+        assertEquals(4, manada.consultaDanio());
+        assertFalse(tazas.get(2).consultaConsumida());
     }
 
     @Test
-    void doblaEnLasZonasDeLaRutaSinPerderVelocidad() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(animal, new Punto(695, 140), 0, 0, 1); // 12 -> 9 (180) -> 6 (100)
-        reglas.actualizacionPosicion(animal, 3000);
-        assertPosicion(695, 240, animal);
-        reglas.actualizacionPosicion(animal, 4000);
-        assertPosicion(695, 180, animal);
+    void unaTazaYaConsumidaNoSeRecogeDeNuevo() {
+        ManadaJugador manada = manada(2, 600, 420);
+        Taza taza = taza("taza-1", 600, 420);
+        assertEquals(1, reglas.recogidaTazas(manada.consultaAnimales().get(0), List.of(taza), mapa));
+        assertEquals(0, reglas.recogidaTazas(manada.consultaAnimales().get(1), List.of(taza), mapa));
+        assertEquals(3, manada.consultaDanio());
     }
 
     @Test
-    void unPasoGrandePuedeCruzarVariosPuntosDeLaRuta() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 375, 330));
-        reglas.inicioMovimiento(animal, new Punto(695, 240), 0, 0, 1); // 7 -> 4 -> 8 -> 9
-        reglas.actualizacionPosicion(animal, 7000); // 420 unidades de una sola vez: el camino mide 410
-        assertPosicion(695, 240, animal);
-        assertFalse(animal.consultaEnMovimiento());
-    }
-
-    @Test
-    void unAnimalFueraDeLosCaminosPrimeroVaAlCamino() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 725, 420)); // en formación, a 30 del centro de la zona 12
-        reglas.inicioMovimiento(animal, new Punto(535, 420), 0, 0, 1);
-        reglas.actualizacionPosicion(animal, 500); // 30 unidades: llega justo al camino
-        assertPosicion(695, 420, animal);
-    }
-
-    @Test
-    void unNuevoDestinoReemplazaLaRutaAnterior() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(animal, new Punto(535, 420), 0, 0, 1);
-        reglas.actualizacionPosicion(animal, 1000);
-        assertPosicion(635, 420, animal);
-        reglas.inicioMovimiento(animal, new Punto(695, 240), 1000, 0, 1); // ahora hacia el otro lado
-        reglas.actualizacionPosicion(animal, 2000);
-        assertPosicion(695, 420, animal); // vuelve las 60 unidades hasta la zona 12
-    }
-
-    @Test
-    void unAnimalMuertoDejaDeMoverse() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(animal, new Punto(535, 420), 0, 0, 1);
-        animal.actualizacionEnergia(0);
-        assertFalse(reglas.actualizacionPosicion(animal, 1000));
-        assertFalse(animal.consultaEnMovimiento());
-        assertPosicion(695, 420, animal);
-    }
-
-    @Test
-    void variosAnimalesTerminanRepartidosYNoEncimados() {
-        Jugador jugador = jugadorConAnimales(5, 695, 420);
-        for (int i = 0; i < 5; i++) {
-            reglas.inicioMovimiento(jugador.consultaManada().consultaAnimales().get(i), new Punto(535, 420), 0, i, 5);
-        }
-        Set<String> posiciones = new HashSet<>();
-        for (Animal animal : jugador.consultaManada().consultaAnimales()) {
-            reglas.actualizacionPosicion(animal, 20000);
-            posiciones.add(animal.consultaPosicion().consultaPosicionX() + "," + animal.consultaPosicion().consultaPosicionY());
-        }
-        assertEquals(5, posiciones.size());
-    }
-
-    @Test
-    void unSoloAnimalTerminaExactamenteEnElDestino() {
-        Animal animal = primerAnimal(jugadorConAnimales(1, 695, 420));
-        reglas.inicioMovimiento(animal, new Punto(575, 420), 0, 0, 1);
-        reglas.actualizacionPosicion(animal, 20000);
-        assertPosicion(575, 420, animal);
-    }
-
-    // ----- Validación de las órdenes -----
-
-    @Test
-    void unaOrdenDeLosPropiosAnimalesVivosEsValida() {
-        Jugador jugador = jugadorConAnimales(3, 695, 420);
-        assertTrue(reglas.validarMovimiento(jugador, jugador.consultaManada().consultaAnimales(), new Punto(500, 300)));
-    }
-
-    @Test
-    void noSePuedenMoverAnimalesAjenos() {
-        Jugador jugador = jugadorConAnimales(1, 695, 420);
-        Jugador otro = jugadorConAnimales(1, 375, 240);
-        assertFalse(reglas.validarMovimiento(jugador, otro.consultaManada().consultaAnimales(), new Punto(500, 300)));
-    }
-
-    @Test
-    void noSePuedeMoverUnAnimalMuertoNiUnaListaVacia() {
-        Jugador jugador = jugadorConAnimales(2, 695, 420);
-        jugador.consultaManada().consultaAnimales().get(1).actualizacionEnergia(0);
-        assertFalse(reglas.validarMovimiento(jugador, jugador.consultaManada().consultaAnimales(), new Punto(500, 300)));
-        assertFalse(reglas.validarMovimiento(jugador, List.of(), new Punto(500, 300)));
-    }
-
-    @Test
-    void elDestinoDebeEstarDentroDelMapa() {
-        Jugador jugador = jugadorConAnimales(1, 695, 420);
-        List<Animal> animales = jugador.consultaManada().consultaAnimales();
-        assertFalse(reglas.validarMovimiento(jugador, animales, new Punto(-1, 100)));
-        assertFalse(reglas.validarMovimiento(jugador, animales, new Punto(100, -1)));
-        assertFalse(reglas.validarMovimiento(jugador, animales, new Punto(951, 100)));
-        assertFalse(reglas.validarMovimiento(jugador, animales, new Punto(100, 551)));
-        assertTrue(reglas.validarMovimiento(jugador, animales, new Punto(0, 0)));
-        assertTrue(reglas.validarMovimiento(jugador, animales, new Punto(950, 550)));
-    }
-
-    @Test
-    void unJugadorSinManadaNoPuedeMoverNada() {
-        assertFalse(reglas.validarMovimiento(new Jugador("Sin manada", null), List.of(), new Punto(1, 1)));
+    void laTazaDeUnaZonaVecinaTambienSeRecogeSiEstaCerca() {
+        // El borde entre las zonas 11 y 12 pasa por x = 615: la taza queda en una zona y el animal en la otra.
+        ManadaJugador manada = manada(1, 625, 420);
+        Taza taza = taza("taza-1", 610, 420);
+        assertEquals(1, reglas.recogidaTazas(manada.consultaAnimales().get(0), List.of(taza), mapa));
     }
 }

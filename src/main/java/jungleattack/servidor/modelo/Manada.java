@@ -4,20 +4,23 @@ import common.model.Especie;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Punto;
+
 
 // Grupo de animales de una misma especie. Manada por especie: dos son de los jugadores, guarda lo que cpomparten 
 // todos los animales y los otros 5 son bots. El ataque lo hace cada animal, no la manada
 public abstract class Manada {
     private final Especie especie;
     private final List<Animal> animales = new ArrayList<>();
-    private int danio;
+    //AtomicInteger porque el daño puede subir (con una taza) desde el hilo de una zona mientras otro hilo lo lee.
+    private final AtomicInteger danio;
     private final int energiaInicial;
 
     protected Manada(Especie especie, int danio, int energiaInicial) {
         this.especie = especie;
-        this.danio = danio;
+        this.danio = new AtomicInteger(danio);
         this.energiaInicial = energiaInicial;
     }
     //Cada tipo de manada decide qué clase de animal crea(jugador o bot)
@@ -31,6 +34,7 @@ public abstract class Manada {
         }
     }
 
+    //Calcula el lugar del animal número "indice" entre "total" repartidos en círculo alrededor del centro.
     public static Punto posicionEnFormacion(common.model.Punto centro, int indice, int total) {
         double angulo = 2 * Math.PI * indice / total; // Divide el círculo completo entre "total" posiciones; "indice" determina el ángulo de este animal.
         int x = centro.consultaPosicionX() + (int) Math.round(ConstantesJuego.RADIO_FORMACION * Math.cos(angulo)); // Usa el coseno para calcular cuánto se desplaza horizontalmente desde el centro.
@@ -80,7 +84,12 @@ public abstract class Manada {
     }
 
     public int consultaDanio() {
-        return danio;
+        return danio.get();
+    }
+
+    // Aumenta el daño de todos los animales de la manada (el daño es de la manada, no de cada animal).
+    protected void incrementoDanio(int cantidad) {
+        danio.addAndGet(cantidad);
     }
 
     public int consultaEnergiaInicial() {

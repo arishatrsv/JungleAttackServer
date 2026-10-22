@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import jungleattack.servidor.mapa.Punto;
 import jungleattack.servidor.mapa.Zona;
 import jungleattack.servidor.modelo.Animal;
+import jungleattack.servidor.modelo.Taza;
 import jungleattack.servidor.partidas.Jugador;
 import jungleattack.servidor.partidas.SesionPartida;
 import jungleattack.servidor.protocolo.ConversorMensajes;
@@ -183,5 +184,93 @@ class MotorJuegoTest {
         motor.cierre();
         assertFalse(motor.consultaActivo());
         motor.cierre(); // cerrar dos veces tampoco falla
+    }
+
+    // ----- Tazas -----
+
+    private int tazasConsumidasEnLaPartida(SesionPartida sesion) {
+        int consumidas = 0;
+        for (Taza taza : sesion.consultaTazas()) {
+            if (taza.consultaConsumida()) {
+                consumidas++;
+            }
+        }
+        return consumidas;
+    }
+
+    @Test
+    void unAnimalQueLlegaAUnaTazaLaConsumeYSubeElDanioDeSuManada() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Taza objetivo = sesion.consultaTazas().get(0);
+        Animal animal = ana.consultaManada().consultaAnimales().get(0);
+        Zona zonaDeLaTaza = sesion.consultaMapa().zonaPorPosicion(objetivo.consultaPosicion());
+
+        assertTrue(sesion.consultaMotor().ejecucionOrdenMovimiento(ana, List.of(animal), objetivo.consultaPosicion()));
+        avanzar(sesion, 60000);
+
+        assertTrue(objetivo.consultaConsumida(), "el animal debió consumir la taza al llegar");
+        assertFalse(zonaDeLaTaza.tazasEnZona().contains(objetivo));
+        // Pudo recoger otras tazas en el camino: el daño sube una vez por cada taza consumida.
+        int consumidas = ana.consultaManada().consultaTazasConsumidas();
+        assertTrue(consumidas >= 1);
+        assertEquals(2 + consumidas, ana.consultaManada().consultaDanio());
+    }
+
+    @Test
+    void elDanioSubeParaTodaLaManadaYNoParaLaDelOponente() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Jugador luis = sesion.consultaJugadores().get(1);
+        Taza objetivo = sesion.consultaTazas().get(0);
+
+        sesion.consultaMotor().ejecucionOrdenMovimiento(ana, List.of(ana.consultaManada().consultaAnimales().get(0)), objetivo.consultaPosicion());
+        avanzar(sesion, 60000);
+
+        assertTrue(ana.consultaManada().consultaDanio() > 2);
+        assertEquals(2, luis.consultaManada().consultaDanio());
+        assertEquals(0, luis.consultaManada().consultaTazasConsumidas());
+    }
+
+    @Test
+    void unaTazaConsumidaDejaDeVerseEnLasActualizaciones() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        ActualizadorPartida actualizador = new ActualizadorPartida(sesion);
+        Taza objetivo = sesion.consultaTazas().get(0);
+        Animal animal = ana.consultaManada().consultaAnimales().get(0);
+
+        sesion.consultaMotor().ejecucionOrdenMovimiento(ana, List.of(animal), objetivo.consultaPosicion());
+        avanzar(sesion, 60000);
+
+        JsonObject estado = ConversorMensajes.contenidoComoObjeto(actualizador.mensajeEstado(ana));
+        assertEquals(ana.consultaManada().consultaTazasConsumidas(), estado.get(ConstantesProtocolo.CAMPO_TAZAS_CONSUMIDAS).getAsInt());
+        assertEquals(ana.consultaManada().consultaDanio(), estado.get(ConstantesProtocolo.CAMPO_DANIO).getAsInt());
+        estado.getAsJsonArray(ConstantesProtocolo.CAMPO_TAZAS).forEach(taza ->
+                assertFalse(objetivo.consultaIdentificador().equals(
+                        taza.getAsJsonObject().get(ConstantesProtocolo.CAMPO_ID).getAsString())));
+    }
+
+    @Test
+    void variosAnimalesQueLlegaranJuntosConsumenLaTazaUnaSolaVez() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Jugador luis = sesion.consultaJugadores().get(1);
+        Taza objetivo = sesion.consultaTazas().get(0);
+
+        sesion.consultaMotor().ejecucionOrdenMovimiento(ana, ana.consultaManada().consultaAnimales(), objetivo.consultaPosicion());
+        avanzar(sesion, 90000);
+
+        // Cada taza consumida cuenta una sola vez, entre todos los jugadores.
+        assertEquals(tazasConsumidasEnLaPartida(sesion),
+                ana.consultaManada().consultaTazasConsumidas() + luis.consultaManada().consultaTazasConsumidas());
+        assertEquals(2 + ana.consultaManada().consultaTazasConsumidas(), ana.consultaManada().consultaDanio());
+    }
+
+    @Test
+    void siNadieSeMueveNingunaTazaSeConsume() {
+        SesionPartida sesion = partida();
+        avanzar(sesion, 20000);
+        assertEquals(0, tazasConsumidasEnLaPartida(sesion));
     }
 }

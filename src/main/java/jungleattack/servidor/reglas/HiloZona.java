@@ -1,5 +1,6 @@
 package jungleattack.servidor.reglas;
 
+import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Mapa;
@@ -14,13 +15,20 @@ public class HiloZona implements Runnable {
     private final Mapa mapa;
     private final ReglasMovimiento reglasMovimiento;
     private final LongSupplier reloj;
+    // Qué hacer después de mover a un animal (por ejemplo, revisar si tocó una taza). Lo define el motor.
+    private final Consumer<Animal> alMoverse;
     private volatile boolean activo = true;
 
     public HiloZona(Zona zona, Mapa mapa, ReglasMovimiento reglasMovimiento, LongSupplier reloj) {
+        this(zona, mapa, reglasMovimiento, reloj, animal -> { });
+    }
+
+    public HiloZona(Zona zona, Mapa mapa, ReglasMovimiento reglasMovimiento, LongSupplier reloj, Consumer<Animal> alMoverse) {
         this.zona = zona;
         this.mapa = mapa;
         this.reglasMovimiento = reglasMovimiento;
         this.reloj = reloj;
+        this.alMoverse = alMoverse;
     }
 
     @Override

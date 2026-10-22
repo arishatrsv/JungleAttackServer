@@ -1,6 +1,7 @@
 package jungleattack.servidor.reglas;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Random;
 import jungleattack.servidor.constantes.ConstantesJuego;
@@ -9,6 +10,7 @@ import jungleattack.servidor.mapa.Mapa;
 import jungleattack.servidor.mapa.Punto;
 import jungleattack.servidor.modelo.Animal;
 import jungleattack.servidor.modelo.Manada;
+import jungleattack.servidor.modelo.ManadaJugador;
 import jungleattack.servidor.modelo.Taza;
 
 //Reglas de los objetos de la partida: dónde se colocan las tazas y qué pasa cuando se consumen.
@@ -34,7 +36,46 @@ public class ReglasObjetos {
         return margen + aleatorio.nextDouble() * (1 - 2 * margen);
     }
 
-    public void consumoTaza(Animal animal, Taza taza) {
+    //Un animal consume una taza: la taza desaparece y el daño de toda la manada del animal sube en 1.
+    //La taza la consume solo el primer animal que la toque, aunque dos la toquen casi al mismo tiempo
+    //Los bots no consumen tazas.
+    public boolean consumoTaza(Animal animal, Taza taza) {
+        if (animal.esBot() || !animal.consultaVida() || !(animal.consultaManada() instanceof ManadaJugador manada)) {
+            return false;
+        }
+        if (!taza.consumo()) {
+            return false;
+        }
+        manada.consumoTaza();
+        return true;
+    }
+
+    //Revisa si un animal que acaba de moverse tocó alguna taza. Las tazas consumidas se sacan de su zona para que dejen de verse
+    //Se revisan todas las tazas de la partida (son solo 10) y no solo las de la zona del animal, porque una
+    //taza cerca del borde de una zona puede quedar a pocos pasos de un animal que está en la zona vecina.
+    public int recogidaTazas(Animal animal, Collection<Taza> tazas, Mapa mapa) {
+        if (animal.esBot() || !animal.consultaVida()) {
+            return 0;
+        }
+        double x;
+        double y;
+        synchronized (animal) { // otro hilo podría estar moviendo al animal
+            x = animal.consultaPosicion().consultaPosicionX();
+            y = animal.consultaPosicion().consultaPosicionY();
+        }
+        int consumidas = 0;
+        for (Taza taza : tazas) {
+            if (taza.consultaConsumida()) {
+                continue;
+            }
+            double distancia = Math.hypot(taza.consultaPosicion().consultaPosicionX() - x,
+                    taza.consultaPosicion().consultaPosicionY() - y);
+            if (distancia <= ConstantesJuego.RADIO_RECOGIDA_TAZA && consumoTaza(animal, taza)) {
+                mapa.zonaPorPosicion(taza.consultaPosicion()).eliminacionTaza(taza);
+                consumidas++;
+            }
+        }
+        return consumidas; //cuántas tazas consumió el animal en esta revisión
     }
 
     public void recuperacionPorEliminaciones(Manada manada) {

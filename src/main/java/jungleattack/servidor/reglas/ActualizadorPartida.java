@@ -65,6 +65,7 @@ public class ActualizadorPartida {
         List<Zona> visibles = zonasVisibles(jugador);
         JsonObject contenido = new JsonObject();
         contenido.addProperty(ConstantesProtocolo.CAMPO_DANIO, manada.consultaDanio());
+        contenido.addProperty(ConstantesProtocolo.CAMPO_TAZAS_CONSUMIDAS, jugador.consultaManada().consultaTazasConsumidas());
 
         JsonArray identificadoresZonas = new JsonArray();
         Map<String, JsonObject> animalesPorId = new LinkedHashMap<>();

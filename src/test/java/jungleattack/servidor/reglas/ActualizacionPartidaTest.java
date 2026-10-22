@@ -206,4 +206,34 @@ class ActualizadorPartidaTest {
                 .getAsJsonArray(ConstantesProtocolo.CAMPO_ANIMALES);
         assertEquals(10, animales.size());
     }
+
+    @Test
+    void laFotoIncluyeLasTazasConsumidasYElDanioActualizado() {
+        SesionPartida sesion = partida();
+        ActualizadorPartida actualizador = new ActualizadorPartida(sesion);
+        Jugador ana = sesion.consultaJugadores().get(0);
+        JsonObject antes = ConversorMensajes.contenidoComoObjeto(actualizador.mensajeEstado(ana));
+        assertEquals(0, antes.get(ConstantesProtocolo.CAMPO_TAZAS_CONSUMIDAS).getAsInt());
+        assertEquals(2, antes.get(ConstantesProtocolo.CAMPO_DANIO).getAsInt());
+
+        ana.consultaManada().consumoTaza();
+
+        JsonObject despues = ConversorMensajes.contenidoComoObjeto(actualizador.mensajeEstado(ana));
+        assertEquals(1, despues.get(ConstantesProtocolo.CAMPO_TAZAS_CONSUMIDAS).getAsInt());
+        assertEquals(3, despues.get(ConstantesProtocolo.CAMPO_DANIO).getAsInt());
+        // Cada jugador ve solo sus propias tazas consumidas.
+        Jugador luis = sesion.consultaJugadores().get(1);
+        assertEquals(0, ConversorMensajes.contenidoComoObjeto(actualizador.mensajeEstado(luis))
+                .get(ConstantesProtocolo.CAMPO_TAZAS_CONSUMIDAS).getAsInt());
+    }
+
+    @Test
+    void consumirUnaTazaCambiaLaFotoYPorEsoSeEnviaUnaActualizacion() {
+        SesionPartida sesion = partida();
+        ActualizadorPartida actualizador = new ActualizadorPartida(sesion);
+        Jugador ana = sesion.consultaJugadores().get(0);
+        String antes = actualizador.mensajeEstado(ana).consultaContenido();
+        ana.consultaManada().consumoTaza();
+        assertFalse(antes.equals(actualizador.mensajeEstado(ana).consultaContenido()));
+    }
 }

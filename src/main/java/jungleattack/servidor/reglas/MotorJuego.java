@@ -21,6 +21,7 @@ import jungleattack.servidor.protocolo.Mensaje;
 public class MotorJuego {
     private final SesionPartida sesion;
     private final ReglasMovimiento reglasMovimiento;
+    private final ReglasObjetos reglasObjetos = new ReglasObjetos();
     private final ActualizadorPartida actualizador;
     private final LongSupplier reloj;
     private final List<HiloZona> hilosZona = new ArrayList<>();
@@ -37,7 +38,7 @@ public class MotorJuego {
         this.reglasMovimiento = new ReglasMovimiento(sesion.consultaMapa());
         this.actualizador = new ActualizadorPartida(sesion);
         for (Zona zona : sesion.consultaMapa().consultaZonas()) {
-            hilosZona.add(new HiloZona(zona, sesion.consultaMapa(), reglasMovimiento, reloj));
+            hilosZona.add(new HiloZona(zona, sesion.consultaMapa(), reglasMovimiento, reloj, this::alMoverseUnAnimal));
         }
     }
     //Arranca los hilos: uno por zona y el que envía las actualizaciones. Todos son daemon, así que no
@@ -82,13 +83,22 @@ public class MotorJuego {
         }
     }
 
+    // Lo que hay que revisar cada vez que un animal se mueve. Por ahora, si tocó una taza.
+    private void alMoverseUnAnimal(Animal animal) {
+        reglasObjetos.recogidaTazas(animal, sesion.consultaTazas(), sesion.consultaMapa());
+    }
+
     public boolean consultaActivo() {
         return activo;
     }
 
     // Si algo falla al enviar, la tarea programada no debe morir: se ignora ese envío y se intenta en el próximo.
     private void envioProtegido() {
-        actualizacionClientes();
+        try {
+            actualizacionClientes();
+        } catch (RuntimeException e) {
+            // Se reintenta en el siguiente ciclo.
+        }
     }
 
     //Ciclo completo sin hilos mueve todos los animales hasta el instante actual del reloj y envía
@@ -101,6 +111,7 @@ public class MotorJuego {
         actualizacionClientes();
     }
 
+    //Ejecuta una orden de movimiento. Cada animal calcula su ruta hasta el destino.
     public boolean ejecucionOrdenMovimiento(Jugador jugador, List<Animal> animales,jungleattack.servidor.mapa.Punto destino) {
         if (!reglasMovimiento.validarMovimiento(jugador, animales, destino)) {
             return false;
