@@ -58,7 +58,9 @@ public class HiloZona implements Runnable {
         for (Animal animal : zona.animalesEnZona()) {
             if (reglasMovimiento.actualizacionPosicion(animal, ahora)) {
                 mapa.actualizacionUbicacionAnimal(animal);
+                alMoverse.accept(animal);
             }
+            alActualizar.accept(animal, ahora);
         }
     }
 

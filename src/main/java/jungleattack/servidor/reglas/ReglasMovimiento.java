@@ -52,6 +52,7 @@ public class ReglasMovimiento {
     //total   cantidad de animales del grupo
     public void inicioMovimiento(Animal animal, common.model.Punto destino, long ahora, int indice, int total) {
         synchronized (animal) {
+            animal.detencionAtaque();
             List<Punto> ruta = new ArrayList<>(calculoRuta(animal.consultaPosicion(), destino));
             if (total > 1 && !ruta.isEmpty()) {
                 Punto llegada = Manada.posicionEnFormacion(ruta.get(ruta.size() - 1), indice, total);
