@@ -8,7 +8,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
-
 import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Zona;
 import jungleattack.servidor.modelo.Animal;
@@ -24,6 +23,8 @@ public class MotorJuego {
     private final SesionPartida sesion;
     private final ReglasMovimiento reglasMovimiento;
     private final ReglasObjetos reglasObjetos = new ReglasObjetos();
+    private final RegistroEventos registroEventos = new RegistroEventos();
+    private final ReglasCombate reglasCombate;
     private final ActualizadorPartida actualizador;
     private final LongSupplier reloj;
     private final List<HiloZona> hilosZona = new ArrayList<>();
@@ -40,6 +41,8 @@ public class MotorJuego {
         this.sesion = sesion;
         this.reloj = reloj;
         this.reglasMovimiento = new ReglasMovimiento(sesion.consultaMapa());
+        this.reglasCombate = new ReglasCombate(sesion.consultaMapa(), sesion.consultaManadas(),
+                registroEventos, reglasObjetos);
         this.actualizador = new ActualizadorPartida(sesion);
         for (Zona zona : sesion.consultaMapa().consultaZonas()) {
             hilosZona.add(new HiloZona(zona, sesion.consultaMapa(), reglasMovimiento, reloj, this::alMoverseUnAnimal,

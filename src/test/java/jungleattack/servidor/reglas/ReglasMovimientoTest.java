@@ -182,39 +182,39 @@ class ReglasMovimientoTest {
     @Test
     void unaOrdenDeLosPropiosAnimalesVivosEsValida() {
         Jugador jugador = jugadorConAnimales(3, 695, 420);
-        assertTrue(reglas.validacionMovimiento(jugador, jugador.consultaManada().consultaAnimales(), new Punto(500, 300)));
+        assertTrue(reglas.validarMovimiento(jugador, jugador.consultaManada().consultaAnimales(), new Punto(500, 300)));
     }
 
     @Test
     void noSePuedenMoverAnimalesAjenos() {
         Jugador jugador = jugadorConAnimales(1, 695, 420);
         Jugador otro = jugadorConAnimales(1, 375, 240);
-        assertFalse(reglas.validacionMovimiento(jugador, otro.consultaManada().consultaAnimales(), new Punto(500, 300)));
+        assertFalse(reglas.validarMovimiento(jugador, otro.consultaManada().consultaAnimales(), new Punto(500, 300)));
     }
 
     @Test
     void noSePuedeMoverUnAnimalMuertoNiUnaListaVacia() {
         Jugador jugador = jugadorConAnimales(2, 695, 420);
         jugador.consultaManada().consultaAnimales().get(1).actualizacionEnergia(0);
-        assertFalse(reglas.validacionMovimiento(jugador, jugador.consultaManada().consultaAnimales(), new Punto(500, 300)));
-        assertFalse(reglas.validacionMovimiento(jugador, List.of(), new Punto(500, 300)));
+        assertFalse(reglas.validarMovimiento(jugador, jugador.consultaManada().consultaAnimales(), new Punto(500, 300)));
+        assertFalse(reglas.validarMovimiento(jugador, List.of(), new Punto(500, 300)));
     }
 
     @Test
     void elDestinoDebeEstarDentroDelMapa() {
         Jugador jugador = jugadorConAnimales(1, 695, 420);
         List<Animal> animales = jugador.consultaManada().consultaAnimales();
-        assertFalse(reglas.validacionMovimiento(jugador, animales, new Punto(-1, 100)));
-        assertFalse(reglas.validacionMovimiento(jugador, animales, new Punto(100, -1)));
-        assertFalse(reglas.validacionMovimiento(jugador, animales, new Punto(951, 100)));
-        assertFalse(reglas.validacionMovimiento(jugador, animales, new Punto(100, 551)));
-        assertTrue(reglas.validacionMovimiento(jugador, animales, new Punto(0, 0)));
-        assertTrue(reglas.validacionMovimiento(jugador, animales, new Punto(950, 550)));
+        assertFalse(reglas.validarMovimiento(jugador, animales, new Punto(-1, 100)));
+        assertFalse(reglas.validarMovimiento(jugador, animales, new Punto(100, -1)));
+        assertFalse(reglas.validarMovimiento(jugador, animales, new Punto(951, 100)));
+        assertFalse(reglas.validarMovimiento(jugador, animales, new Punto(100, 551)));
+        assertTrue(reglas.validarMovimiento(jugador, animales, new Punto(0, 0)));
+        assertTrue(reglas.validarMovimiento(jugador, animales, new Punto(950, 550)));
     }
 
     @Test
     void unJugadorSinManadaNoPuedeMoverNada() {
-        assertFalse(reglas.validacionMovimiento(new Jugador("Sin manada", null), List.of(), new Punto(1, 1)));
+        assertFalse(reglas.validarMovimiento(new Jugador("Sin manada", null), List.of(), new Punto(1, 1)));
     }
 
     @Test

@@ -1,7 +1,6 @@
 package jungleattack.servidor.reglas;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import common.constantes.ConstantesProtocolo;
 import java.util.ArrayList;
