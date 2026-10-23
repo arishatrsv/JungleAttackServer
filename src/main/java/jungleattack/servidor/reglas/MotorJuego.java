@@ -93,8 +93,11 @@ public class MotorJuego {
         }
     }
 
-    // Lo que hay que revisar cada vez que un animal se mueve. Por ahora, si tocó una taza.
+    // Revisa si el animal ganó al tocar una bandera o si recogió una taza.
     private void alMoverseUnAnimal(Animal animal) {
+        if (comprobacionVictoria(animal)) {
+            return;
+        }
         reglasObjetos.recogidaTazas(animal, sesion.consultaTazas(), sesion.consultaMapa());
     }
 

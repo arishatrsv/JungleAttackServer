@@ -49,8 +49,8 @@ public class ResumenPartida {
     }
 
     public ResumenPartida(Jugador ganador, String razon, double duracion, Map<Jugador, Estadisticas> estadisticas){
-        this ganador = ganador;
-        this razon = razon;
+        this.ganador = ganador;
+        this.razon = razon;
         this.duracion = duracion;
         this.estadisticas.putAll(estadisticas);
     }
