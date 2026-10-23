@@ -261,7 +261,7 @@ class ServidorIntegracionTest {
     }
 
     @Test
-    void siUnJugadorSeVaConLaPartidaEnCursoElOtroRecibeElError() throws Exception {
+    void siUnJugadorSeVaConLaPartidaEnCursoElOtroGanaPorAbandono() throws Exception {
         int[] puerto = new int[1];
         ServidorSockets servidor = arrancarServidor(puerto);
         try (ClientePrueba ana = new ClientePrueba(puerto[0])) {
@@ -270,7 +270,20 @@ class ServidorIntegracionTest {
                 ana.leer(); // GAME_STARTED
                 segundoJugador.leer(); // GAME_STARTED
             } // El segundo jugador se desconecta con la partida en curso.
-            ana.esperarError(ConstantesProtocolo.MOTIVO_OPONENTE_DESCONECTADO);
+            Mensaje fin = ana.leer();
+            assertEquals(ConstantesProtocolo.FIN_PARTIDA, fin.consultaTipo());
+            JsonObject contenido = ConversorMensajes.contenidoComoObjeto(fin);
+            assertEquals(ConstantesProtocolo.RESULTADO_VICTORIA, contenido.get(ConstantesProtocolo.CAMPO_RESULTADO).getAsString());
+            assertEquals(ConstantesProtocolo.RAZON_ABANDONO, contenido.get(ConstantesProtocolo.CAMPO_RAZON).getAsString());
+            assertEquals("Ana", contenido.get(ConstantesProtocolo.CAMPO_GANADOR).getAsString());
+            assertEquals("jaguar", contenido.getAsJsonObject(ConstantesProtocolo.CAMPO_RESUMEN_PROPIO)
+                    .get(ConstantesProtocolo.CAMPO_ESPECIE).getAsString());
+            assertEquals("tucan", contenido.getAsJsonObject(ConstantesProtocolo.CAMPO_RESUMEN_OPONENTE)
+                    .get(ConstantesProtocolo.CAMPO_ESPECIE).getAsString());
+
+            // Ana ya no está en la partida: puede crear otra.
+            ana.enviar(ConstantesProtocolo.CREAR_PARTIDA, ConstantesProtocolo.CAMPO_APODO, "Ana");
+            assertEquals(ConstantesProtocolo.PARTIDA_CREADA, ana.leer().consultaTipo());
         } finally {
             servidor.cierre();
         }

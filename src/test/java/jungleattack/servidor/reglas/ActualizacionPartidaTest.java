@@ -236,4 +236,44 @@ class ActualizadorPartidaTest {
         ana.consultaManada().consumoTaza();
         assertFalse(antes.equals(actualizador.mensajeEstado(ana).consultaContenido()));
     }
+
+    @Test
+    void elMensajeDeFinTraeElResultadoYElResumenDeCadaPerspectiva() {
+        SesionPartida sesion = partida();
+        ActualizadorPartida actualizador = new ActualizadorPartida(sesion);
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Jugador luis = sesion.consultaJugadores().get(1);
+        ana.consultaManada().registroBotEliminado();
+        ana.consultaManada().registroBotEliminado();
+        ana.consultaManada().consumoTaza();
+        luis.consultaManada().consultaAnimales().get(0).recepcionDanio(100);
+        luis.consultaManada().consultaAnimales().get(1).recepcionDanio(100);
+
+        assertTrue(sesion.finalizacion(ana, ConstantesProtocolo.RAZON_BANDERA));
+
+        Mensaje paraAna = actualizador.mensajeFin(ana);
+        assertEquals(ConstantesProtocolo.FIN_PARTIDA, paraAna.consultaTipo());
+        JsonObject deAna = ConversorMensajes.contenidoComoObjeto(paraAna);
+        assertEquals(ConstantesProtocolo.RESULTADO_VICTORIA, deAna.get(ConstantesProtocolo.CAMPO_RESULTADO).getAsString());
+        assertEquals("Ana", deAna.get(ConstantesProtocolo.CAMPO_GANADOR).getAsString());
+        assertEquals(ConstantesProtocolo.RAZON_BANDERA, deAna.get(ConstantesProtocolo.CAMPO_RAZON).getAsString());
+        assertTrue(deAna.get(ConstantesProtocolo.CAMPO_DURACION).getAsInt() >= 0);
+        JsonObject propio = deAna.getAsJsonObject(ConstantesProtocolo.CAMPO_RESUMEN_PROPIO);
+        assertEquals("Ana", propio.get(ConstantesProtocolo.CAMPO_APODO).getAsString());
+        assertEquals("jaguar", propio.get(ConstantesProtocolo.CAMPO_ESPECIE).getAsString());
+        assertEquals(2, propio.get(ConstantesProtocolo.CAMPO_BOTS_ELIMINADOS).getAsInt());
+        assertEquals(0, propio.get(ConstantesProtocolo.CAMPO_ANIMALES_PERDIDOS).getAsInt());
+        assertEquals(1, propio.get(ConstantesProtocolo.CAMPO_TAZAS_CONSUMIDAS).getAsInt());
+        JsonObject oponente = deAna.getAsJsonObject(ConstantesProtocolo.CAMPO_RESUMEN_OPONENTE);
+        assertEquals("Luis", oponente.get(ConstantesProtocolo.CAMPO_APODO).getAsString());
+        assertEquals(2, oponente.get(ConstantesProtocolo.CAMPO_ANIMALES_PERDIDOS).getAsInt());
+
+        // Luis recibe el mismo resumen pero con su propia perspectiva: perdió, y "propio" son sus datos.
+        JsonObject deLuis = ConversorMensajes.contenidoComoObjeto(actualizador.mensajeFin(luis));
+        assertEquals(ConstantesProtocolo.RESULTADO_DERROTA, deLuis.get(ConstantesProtocolo.CAMPO_RESULTADO).getAsString());
+        assertEquals("Ana", deLuis.get(ConstantesProtocolo.CAMPO_GANADOR).getAsString());
+        assertEquals("Luis", deLuis.getAsJsonObject(ConstantesProtocolo.CAMPO_RESUMEN_PROPIO).get(ConstantesProtocolo.CAMPO_APODO).getAsString());
+        assertEquals(2, deLuis.getAsJsonObject(ConstantesProtocolo.CAMPO_RESUMEN_PROPIO).get(ConstantesProtocolo.CAMPO_ANIMALES_PERDIDOS).getAsInt());
+        assertEquals(2, deLuis.getAsJsonObject(ConstantesProtocolo.CAMPO_RESUMEN_OPONENTE).get(ConstantesProtocolo.CAMPO_BOTS_ELIMINADOS).getAsInt());
+    }
 }

@@ -66,7 +66,7 @@ class SesionPartidaInicioTest {
         assertTrue(sesion.inicio());
         assertEquals(EstadoPartida.EN_CURSO, sesion.consultaEstado());
         assertNotNull(sesion.consultaMapa());
-        assertNotNull(sesion.consultaResumen());
+        assertNull(sesion.consultaResumen()); // el resumen se crea cuando la partida termina
     }
 
     @Test

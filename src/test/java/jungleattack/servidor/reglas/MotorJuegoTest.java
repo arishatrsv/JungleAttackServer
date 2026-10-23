@@ -2,6 +2,7 @@ package jungleattack.servidor.reglas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
@@ -17,8 +18,10 @@ import jungleattack.servidor.mapa.Punto;
 import jungleattack.servidor.mapa.Zona;
 import jungleattack.servidor.modelo.Animal;
 import jungleattack.servidor.modelo.AnimalBot;
+import jungleattack.servidor.modelo.Bandera;
 import jungleattack.servidor.modelo.ManadaBots;
 import jungleattack.servidor.modelo.Taza;
+import jungleattack.servidor.partidas.EstadoPartida;
 import jungleattack.servidor.partidas.Jugador;
 import jungleattack.servidor.partidas.SesionPartida;
 import jungleattack.servidor.protocolo.ConversorMensajes;
@@ -507,5 +510,64 @@ class MotorJuegoTest {
             }
         }
         assertTrue(hayMuerte);
+    }
+
+    // ----- Victoria por bandera -----
+
+    private Bandera banderaDe(SesionPartida sesion, Jugador jugador) {
+        return sesion.consultaBanderas().stream().filter(b -> b.consultaPropietario() == jugador).findFirst().get();
+    }
+
+    @Test
+    void unAnimalQueLlegaALaBanderaDelOponenteGanaLaPartida() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Jugador luis = sesion.consultaJugadores().get(1);
+        Bandera banderaDeLuis = banderaDe(sesion, luis);
+        Animal corredor = ana.consultaManada().consultaAnimales().get(0);
+        // El animal sale desde cerca de la zona de Luis, para no depender del largo del camino.
+        colocar(sesion, corredor, banderaDeLuis.consultaPosicion().consultaPosicionX() + 60, banderaDeLuis.consultaPosicion().consultaPosicionY());
+        reloj.set(10000);
+
+        assertTrue(sesion.consultaMotor().ejecucionOrdenMovimiento(ana, List.of(corredor), banderaDeLuis.consultaPosicion()));
+        assertEquals(EstadoPartida.EN_CURSO, sesion.consultaEstado());
+        avanzar(sesion, 5000);
+
+        assertEquals(EstadoPartida.FINALIZADA, sesion.consultaEstado());
+        assertSame(ana, sesion.consultaResumen().consultaGanador());
+        assertEquals(ConstantesProtocolo.RAZON_BANDERA, sesion.consultaResumen().consultaRazon());
+        assertTrue(sesion.consultaResumen().consultaDuracion() >= 10.0);
+    }
+
+    @Test
+    void pasearPorLaPropiaBanderaNoTerminaLaPartida() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Bandera propia = banderaDe(sesion, ana);
+        Animal animal = ana.consultaManada().consultaAnimales().get(0);
+        sesion.consultaMotor().ejecucionOrdenMovimiento(ana, List.of(animal), propia.consultaPosicion());
+        avanzar(sesion, 5000);
+        assertEquals(EstadoPartida.EN_CURSO, sesion.consultaEstado());
+        assertEquals(null, sesion.consultaResumen());
+    }
+
+    @Test
+    void despuesDeTerminarYaNoSeMueveNadaNiSeEnviaNada() {
+        SesionPartida sesion = partida();
+        Jugador ana = sesion.consultaJugadores().get(0);
+        Jugador luis = sesion.consultaJugadores().get(1);
+        Bandera banderaDeLuis = banderaDe(sesion, luis);
+        Animal corredor = ana.consultaManada().consultaAnimales().get(0);
+        Animal otro = ana.consultaManada().consultaAnimales().get(1);
+        colocar(sesion, corredor, banderaDeLuis.consultaPosicion().consultaPosicionX() + 40, banderaDeLuis.consultaPosicion().consultaPosicionY());
+        sesion.consultaMotor().ejecucionOrdenMovimiento(ana, List.of(corredor), banderaDeLuis.consultaPosicion());
+        avanzar(sesion, 5000);
+        assertEquals(EstadoPartida.FINALIZADA, sesion.consultaEstado());
+
+        // El motor se detuvo: un animal con una orden de movimiento ya no avanza porque los hilos están cerrados,
+        // y la partida no vuelve a cambiar de resultado.
+        assertFalse(sesion.finalizacion(luis, ConstantesProtocolo.RAZON_BANDERA));
+        assertSame(ana, sesion.consultaResumen().consultaGanador());
+        assertTrue(otro.consultaVida());
     }
 }
