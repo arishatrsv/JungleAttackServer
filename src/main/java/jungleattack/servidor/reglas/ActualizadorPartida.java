@@ -15,6 +15,7 @@ import jungleattack.servidor.modelo.EventoCombate;
 import jungleattack.servidor.modelo.Manada;
 import jungleattack.servidor.modelo.Taza;
 import jungleattack.servidor.partidas.Jugador;
+import jungleattack.servidor.partidas.ResumenPartida;
 import jungleattack.servidor.partidas.SesionPartida;
 import jungleattack.servidor.protocolo.ConversorMensajes;
 import jungleattack.servidor.protocolo.Mensaje;
@@ -70,6 +71,35 @@ public class ActualizadorPartida {
         }
         contenido.add(ConstantesProtocolo.CAMPO_EVENTOS, lista);
         return ConversorMensajes.creacionMensajeConContenido(ConstantesProtocolo.ACTUALIZACION_ESTADO, contenido);
+    }
+
+    //Envía el mensaje de fin, con su propio resultado y el resumen de la partida
+    public Mensaje mensajeFin(Jugador receptor) {
+        ResumenPartida resumen = sesion.consultaResumen();
+        JsonObject contenido = new JsonObject();
+        boolean gano = resumen.consultaGanador() == receptor;
+        contenido.addProperty(ConstantesProtocolo.CAMPO_RESULTADO,
+                gano ? ConstantesProtocolo.RESULTADO_VICTORIA : ConstantesProtocolo.RESULTADO_DERROTA);
+        contenido.addProperty(ConstantesProtocolo.CAMPO_GANADOR, resumen.consultaGanador().consultaApodo());
+        contenido.addProperty(ConstantesProtocolo.CAMPO_RAZON, resumen.consultaRazon());
+        contenido.addProperty(ConstantesProtocolo.CAMPO_DURACION, Math.round(resumen.consultaDuracion()));
+        contenido.add(ConstantesProtocolo.CAMPO_RESUMEN_PROPIO, datosEstadisticas(resumen.consultaEstadisticas(receptor)));
+        for (Jugador jugador : sesion.consultaJugadores()) {
+            if (jugador != receptor) {
+                contenido.add(ConstantesProtocolo.CAMPO_RESUMEN_OPONENTE, datosEstadisticas(resumen.consultaEstadisticas(jugador)));
+            }
+        }
+        return ConversorMensajes.creacionMensajeConContenido(ConstantesProtocolo.FIN_PARTIDA, contenido);
+    }
+
+    private JsonObject datosEstadisticas(ResumenPartida.Estadisticas estadisticas) {
+        JsonObject datos = new JsonObject();
+        datos.addProperty(ConstantesProtocolo.CAMPO_APODO, estadisticas.consultaApodo());
+        datos.addProperty(ConstantesProtocolo.CAMPO_ESPECIE, estadisticas.consultaEspecie().consultaIdentificador());
+        datos.addProperty(ConstantesProtocolo.CAMPO_BOTS_ELIMINADOS, estadisticas.consultaBotsEliminados());
+        datos.addProperty(ConstantesProtocolo.CAMPO_ANIMALES_PERDIDOS, estadisticas.consultaAnimalesPerdidos());
+        datos.addProperty(ConstantesProtocolo.CAMPO_TAZAS_CONSUMIDAS, estadisticas.consultaTazasConsumidas());
+        return datos;
     }
 
     private JsonObject datosEvento(EventoCombate evento) {

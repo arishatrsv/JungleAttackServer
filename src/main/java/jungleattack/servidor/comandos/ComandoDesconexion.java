@@ -32,9 +32,19 @@ public class ComandoDesconexion implements ComandoCliente {
 
         if (sesion.cantidadJugadoresConectados() == 0) {
             gestorPartidas.eliminacionPartida(sesion.consultaCodigo());
+        } else if (sesion.consultaEstado() == EstadoPartida.EN_CURSO) {
+            //Si el jugador se va antes de que termine la partida, gana el que se queda
+                        Jugador restante = null;
+            for (Jugador candidato : sesion.consultaJugadores()) {
+                if (candidato.consultaConectado()) {
+                    restante = candidato;
+                }
+            }
+            sesion.finalizacion(restante, ConstantesProtocolo.RAZON_ABANDONO);
+            gestorPartidas.eliminacionPartida(sesion.consultaCodigo());
         } else if (sesion.consultaEstado() != EstadoPartida.FINALIZADA) {
-            //Si el jugador se va antes de que termine la partida, la partida se cancela y
-            //el otro jugador recibe el error.
+            // Si se va antes de empezar (esperando o eligiendo), la partida se cancela y el otro jugador
+            // recibe el error de DESCONECTADO.
             sesion.cancelacion(ConstantesProtocolo.MOTIVO_OPONENTE_DESCONECTADO);
             gestorPartidas.eliminacionPartida(sesion.consultaCodigo());
         }

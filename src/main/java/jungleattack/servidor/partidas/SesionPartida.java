@@ -22,6 +22,7 @@ import jungleattack.servidor.red.ManejadorCliente;
 import jungleattack.servidor.reglas.ActualizadorPartida;
 import jungleattack.servidor.reglas.MotorJuego;
 import jungleattack.servidor.reglas.ReglasObjetos;
+import jungleattack.servidor.reglas.ReglasVictoria;
 
 // Representa una partida en curso, con sus jugadores, estado y elementos del juego.
 public class SesionPartida {
@@ -40,12 +41,16 @@ public class SesionPartida {
     // Una bandera por jugador gana quien toque la del oponente.
     private final List<Bandera> banderas = new CopyOnWriteArrayList<>();
     private ResumenPartida resumen;
+    //Instante (milisegundos) en que empezó la partida.
+    private long inicioPartida;
+    private volatile ReglasVictoria reglasVictoria;
+    //Qué hacer cuando la partida termina (el gestor la saca de sus partidas activas).
+    private volatile Runnable alFinalizar = () -> { };
     //Coordina el movimiento y las actualizaciones. Se crea al iniciar la partida.
-    private MotorJuego motorJuego;
-    //Si es false el motor no arranca sus hilos.
+    private volatile MotorJuego motorJuego;
+    //Si es false el motor no arranca sus hilos .
     private final boolean motorActivo;
     private final LongSupplier reloj;
-
     private final Random aleatorio; //para poder repetir el sorteo de zonas y tazas en las pruebas.
 
     // Crea la partida en estado de espera, hasta que llegue el segundo jugador.
@@ -183,6 +188,7 @@ public class SesionPartida {
         return List.copyOf(jugadores); // copia de solo lectura
     }
 
+    //Empieza la partida cuando los dos jugadores ya eligieron su especie
     public synchronized boolean inicio() {
         if (estado != EstadoPartida.SELECCION_ESPECIE || !seleccionCompleta()) { // Solo inicia si sigue en selección y todos los jugadores eligieron especie.
             return false; // Si no se cumple alguna condición, no modifica la partida.
@@ -213,10 +219,11 @@ public class SesionPartida {
             nuevoMapa.zonaPorPosicion(taza.consultaPosicion()).registroTaza(taza); // La registra también en la zona del mapa donde quedó colocada.
         }
 
-        resumen = new ResumenPartida(); // Prepara el resumen para registrar los resultados de la partida.
-        mapa = nuevoMapa; // Guarda como mapa activo el que se acaba de preparar.
-        estado = EstadoPartida.EN_CURSO; // Cambia el estado antes de notificar que la partida comenzó.
-        motorJuego = new MotorJuego(this, reloj); //El motor se crea apenas empieza la partida ya lo encuentra.
+        inicioPartida = reloj.getAsLong();
+        reglasVictoria = new ReglasVictoria(consultaBanderas(), consultaJugadores());
+        mapa = nuevoMapa;
+        // El motor se crea antes de pasar a EN_CURSO: así un comando que llegue apenas empieza la partida ya lo encuentra.
+        motorJuego = new MotorJuego(this, reloj);
         estado = EstadoPartida.EN_CURSO;
         new ActualizadorPartida(this).envioInicio();
         if (motorActivo) {
@@ -238,8 +245,36 @@ public class SesionPartida {
         // TODO: implementar
     }
 
-    public void finalizacion() {
-        // TODO: implementar
+    //Termina la partida, gana un jugador.Guarda el resumen detiene el motor y le envía GAME_OVER a cada jugador
+    //Es synchronized y revisa el estado, así que si dos animales tocan las banderas
+    //casi al mismo tiempo (desde hilos distintos), gana solo el primero
+    public synchronized boolean finalizacion(Jugador ganador, String razon) {
+        if (estado != EstadoPartida.EN_CURSO) {
+            return false;
+        }
+        estado = EstadoPartida.FINALIZADA;
+        resumen = reglasVictoria.creacionResumen(ganador, razon, inicioPartida, reloj.getAsLong());
+        if (motorJuego != null) {
+            motorJuego.cierre();
+        }
+        ActualizadorPartida actualizador = new ActualizadorPartida(this);
+        for (Jugador jugador : jugadores) {
+            if (jugador.consultaConectado()) {
+                jugador.salidaDePartida();
+                jugador.envioMensaje(actualizador.mensajeFin(jugador));
+            }
+        }
+        alFinalizar.run();
+        return true;
+    }
+
+    // Define qué hacer cuando la partida termine. Lo usa el gestor para sacar la partida de las activas.
+    public void registroAlFinalizar(Runnable accion) {
+        this.alFinalizar = accion;
+    }
+
+    public ReglasVictoria consultaReglasVictoria() {
+        return reglasVictoria;
     }
 
     // Busca un animal de la partida (de cualquier manada) por su identificador, o null si no existe.

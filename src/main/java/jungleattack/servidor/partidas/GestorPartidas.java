@@ -28,6 +28,7 @@ public class GestorPartidas {
     public GestorPartidas(Random aleatorio) {
         this.aleatorio = aleatorio;
     }
+
     //Crea una partida nueva con un código único y la guarda.
     public SesionPartida creacionPartida() {
         if (partidas.size() >= ConfiguracionServidor.MAX_PARTIDAS) {
@@ -39,6 +40,8 @@ public class GestorPartidas {
             String codigo = generacionCodigo();
             SesionPartida sesion = new SesionPartida(codigo, aleatorio);
             if (partidas.putIfAbsent(codigo, sesion) == null) {
+                // Cuando la partida termina por una victoria, deja de estar entre las activas.
+                sesion.registroAlFinalizar(() -> eliminacionPartida(codigo));
                 return sesion;
             }
         }

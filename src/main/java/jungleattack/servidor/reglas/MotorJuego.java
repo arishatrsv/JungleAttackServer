@@ -8,6 +8,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
+import common.constantes.ConstantesProtocolo;
 import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Zona;
 import jungleattack.servidor.modelo.Animal;
@@ -101,7 +102,7 @@ public class MotorJuego {
         return activo;
     }
 
-    // Si algo falla al enviar, la tarea programada no debe morir: se ignora ese envío y se intenta en el próximo.
+    //Si algo falla al enviar, la tarea programada no debe morir: se ignora ese envío y se intenta en el próximo.
     private void envioProtegido() {
         try {
             actualizacionClientes();
@@ -155,9 +156,9 @@ public class MotorJuego {
         return zonaObjetivo != null && actualizador.zonasVisibles(jugador).contains(zonaObjetivo);
     }
 
-    public boolean comprobacionVictoria() {
-        // TODO: implementar
-        return false;
+    public boolean comprobacionVictoria(Animal animal) {
+        Jugador ganador = sesion.consultaReglasVictoria().comprobacionVictoria(animal);
+        return ganador != null && sesion.finalizacion(ganador, ConstantesProtocolo.RAZON_BANDERA);
     }
 
     //Envía a cada jugador su STATE_UPDATE, solo si lo que ve cambió desde el último envío
