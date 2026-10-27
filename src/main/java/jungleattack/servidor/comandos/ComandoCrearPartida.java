@@ -1,7 +1,6 @@
 package jungleattack.servidor.comandos;
 
 import common.constantes.ConstantesProtocolo;
-import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.partidas.GestorPartidas;
 import jungleattack.servidor.partidas.Jugador;
 import jungleattack.servidor.partidas.SesionPartida;
@@ -9,7 +8,6 @@ import jungleattack.servidor.protocolo.ConversorMensajes;
 import jungleattack.servidor.protocolo.Mensaje;
 
 // Comando que crea una partida nueva y asocia al cliente que lo envía como primer jugador.
-
 public class ComandoCrearPartida implements ComandoCliente {
     // El gestor es donde viven todas las partidas del servidor.
     private final GestorPartidas gestorPartidas;

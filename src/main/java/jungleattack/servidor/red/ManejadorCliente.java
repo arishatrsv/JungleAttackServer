@@ -4,6 +4,7 @@ import common.constantes.ConstantesProtocolo;
 import jungleattack.servidor.comandos.ComandoCliente;
 import jungleattack.servidor.comandos.ContextoCliente;
 import jungleattack.servidor.partidas.GestorPartidas;
+import jungleattack.servidor.protocolo.ConversorMensajes;
 import jungleattack.servidor.protocolo.Mensaje;
 import jungleattack.servidor.protocolo.ProcesadorMensajes;
 import java.io.BufferedReader;
@@ -15,10 +16,14 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 // Maneja la conexión con un cliente: recibe y envía mensajes, 
 // y ejecuta los comandos que vienen en los mensajes.
 public class ManejadorCliente {
+
+    private static final Logger REGISTRO = Logger.getLogger(ManejadorCliente.class.getName());
 
     private final Socket socket;
     private final ContextoCliente contexto;
@@ -74,6 +79,11 @@ public class ManejadorCliente {
         }
         try {
             comando.ejecucion(mensaje, contexto);
+        } catch (RuntimeException e) {
+            // Un fallo en un comando no debe cortar la conexión del jugador: se registra y se le avisa.
+            REGISTRO.log(Level.SEVERE, "Falló el comando " + mensaje.consultaTipo(), e);
+            contexto.envioMensaje(ConversorMensajes.creacionMensaje(
+                    ConstantesProtocolo.ERROR, ConstantesProtocolo.CAMPO_MOTIVO, ConstantesProtocolo.MOTIVO_ERROR_INTERNO));
         } finally {
             semaforo.release(); //libera el semaforo aunque hay error
         }

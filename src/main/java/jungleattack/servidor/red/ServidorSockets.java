@@ -35,8 +35,7 @@ public class ServidorSockets {
             REGISTRO.info("Servidor escuchando en el puerto " + puerto);
             while (activo) {
                 Socket socketCliente = socketServidor.accept(); // espera a que llegue un cliente
-                ManejadorCliente manejador = new ManejadorCliente(socketCliente, gestorPartidas);
-                hilos.execute(manejador::recepcionMensajes);    // cada cliente en su propio hilo
+                atencionCliente(socketCliente);
             }
         } catch (IOException e) {
             if (activo) { //si es false es porque se llamó a cierre() 
@@ -45,6 +44,22 @@ public class ServidorSockets {
         } finally {
             activo = false;
             hilos.shutdown();
+        }
+    }
+
+    // Prepara la atención de un cliente recién aceptado y la ejecuta en su propio hilo.
+    // Si algo falla con ESTE cliente, solo se cierra su socket: el servidor sigue aceptando a los demás.
+    private void atencionCliente(Socket socketCliente) {
+        try {
+            ManejadorCliente manejador = new ManejadorCliente(socketCliente, gestorPartidas);
+            hilos.execute(manejador::recepcionMensajes); // cada cliente en su propio hilo
+        } catch (IOException | RuntimeException e) {
+            REGISTRO.log(Level.WARNING, "No se pudo atender a un cliente", e);
+            try {
+                socketCliente.close();
+            } catch (IOException ignorado) {
+                // el socket ya estaba cerrado
+            }
         }
     }
 
@@ -60,3 +75,4 @@ public class ServidorSockets {
         }
     }
 }
+

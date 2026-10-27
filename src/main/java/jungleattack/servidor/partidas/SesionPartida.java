@@ -241,10 +241,6 @@ public class SesionPartida {
         manadas.add(manada);
     }
 
-    public void actualizacion() {
-        // TODO: implementar
-    }
-
     //Termina la partida, gana un jugador.Guarda el resumen detiene el motor y le envía GAME_OVER a cada jugador
     //Es synchronized y revisa el estado, así que si dos animales tocan las banderas
     //casi al mismo tiempo (desde hilos distintos), gana solo el primero

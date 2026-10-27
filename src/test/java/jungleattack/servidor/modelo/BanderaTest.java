@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import common.model.Especie;
+import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Mapa;
 import jungleattack.servidor.mapa.Punto;
 import jungleattack.servidor.mapa.Zona;
@@ -11,6 +12,9 @@ import jungleattack.servidor.partidas.Jugador;
 import org.junit.jupiter.api.Test;
 
 class BanderaTest {
+
+    // El radio sale de la constante, así las pruebas siguen valiendo si se cambia el valor.
+    private static final int RADIO = ConstantesJuego.RADIO_BANDERA;
 
     private final Mapa mapa = crearMapa();
     private final Zona zona = mapa.zonaPorIdentificador(12); // centro (695, 420)
@@ -44,14 +48,13 @@ class BanderaTest {
     @Test
     void unAnimalDelRivalEnElRadioLaToca() {
         assertTrue(bandera.deteccionContacto(animalDe(rival, 695, 420)));
-        assertTrue(bandera.deteccionContacto(animalDe(rival, 710, 410)));
+        assertTrue(bandera.deteccionContacto(animalDe(rival, 695 + RADIO / 2, 420 + RADIO / 2))); // en diagonal, dentro del radio
     }
 
     @Test
     void elLimiteDelRadioCuentaComoTocar() {
-        assertTrue(bandera.deteccionContacto(animalDe(rival, 715, 420))); // exactamente a 20
-        assertFalse(bandera.deteccionContacto(animalDe(rival, 716, 420))); // a 21
-        assertTrue(bandera.deteccionContacto(animalDe(rival, 695 + 12, 420 + 16))); // diagonal: 12 y 16 dan 20
+        assertTrue(bandera.deteccionContacto(animalDe(rival, 695 + RADIO, 420))); // exactamente en el borde
+        assertFalse(bandera.deteccionContacto(animalDe(rival, 695 + RADIO + 1, 420))); // un paso afuera
     }
 
     @Test

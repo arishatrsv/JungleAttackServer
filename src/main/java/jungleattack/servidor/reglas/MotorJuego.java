@@ -7,6 +7,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.function.LongSupplier;
 import common.constantes.ConstantesProtocolo;
 import jungleattack.servidor.constantes.ConstantesJuego;
@@ -21,6 +23,7 @@ import jungleattack.servidor.protocolo.Mensaje;
 //Crea un hilo por zona (HiloZona) que mueve a los animales, y un hilo aparte que cada cierto tiempo
 //envía a cada jugador su STATE_UPDATE, pero solo si lo que ve cambió desde el último envío.
 public class MotorJuego {
+    private static final Logger REGISTRO = Logger.getLogger(MotorJuego.class.getName());
     private final SesionPartida sesion;
     private final ReglasMovimiento reglasMovimiento;
     private final ReglasObjetos reglasObjetos = new ReglasObjetos();
@@ -110,7 +113,8 @@ public class MotorJuego {
         try {
             actualizacionClientes();
         } catch (RuntimeException e) {
-            // Se reintenta en el siguiente ciclo.
+            // Se reintenta en el siguiente ciclo, pero el fallo queda registrado.
+            REGISTRO.log(Level.WARNING, "Falló el envío del estado a los clientes", e);
         }
     }
 
@@ -217,3 +221,4 @@ public class MotorJuego {
         return reglasMovimiento;
     }
 }
+

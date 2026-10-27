@@ -212,16 +212,4 @@ public class ActualizadorPartida {
         datos.addProperty(ConstantesProtocolo.CAMPO_ES_PROPIO, bandera.consultaPropietario() == jugador);
         return datos;
     }
-
-    public void actualizacionZona(Zona zona) {
-    }
-
-    public void actualizacionMovimiento(Animal animal) {
-    }
-
-    public void actualizacionCombate() {
-    }
-
-    public void actualizacionEstado() {
-    }
 }

@@ -81,9 +81,6 @@ public abstract class Manada {
         return animalesVivos().size();
     }
 
-    public void actualizacionManada() {
-    }
-
     public Especie consultaEspecie() {
         return especie;
     }

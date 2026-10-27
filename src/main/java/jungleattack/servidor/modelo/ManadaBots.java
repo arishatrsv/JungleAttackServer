@@ -1,6 +1,5 @@
 package jungleattack.servidor.modelo;
 import common.model.Especie;
-import java.util.List;
 import jungleattack.servidor.constantes.ConstantesJuego;
 import jungleattack.servidor.mapa.Punto;
 
@@ -13,12 +12,5 @@ public class ManadaBots extends Manada {
     @Override
     protected Animal creacionAnimal(String identificador, Punto posicion) {
         return new AnimalBot(identificador, consultaEspecie(), consultaEnergiaInicial(), posicion);
-    }
-
-    public void actualizacionBots() {
-    }
-
-    public List<Animal> animalesEnAlcance(Animal animal) {
-        return null;
     }
 }
