@@ -101,7 +101,7 @@ class HiloZonaTest {
 
     @Test
     void alUnAnimalQuietoNoSeLeAplicaElGancho() {
-        Animal animal = animalEnLaZona12(); // sin orden de movimiento
+        animalEnLaZona12(); // registra un animal sin orden de movimiento
         List<Animal> movidos = new ArrayList<>();
         HiloZona hilo = new HiloZona(mapa.zonaPorIdentificador(12), mapa, reglas, reloj::get, movidos::add);
         hilo.actualizacionZona(500);
