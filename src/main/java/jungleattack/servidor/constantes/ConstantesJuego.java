@@ -21,7 +21,7 @@ public class ConstantesJuego {
     public static final int DISTANCIA_MINIMA_TAZA_ZONA = 40; //Distancia mínima entre una taza y el centro de las dos zonas que une su camino
     public static final String SEPARADOR_IDENTIFICADOR = "-"; // jaguar-1, jaguar-2... taza-1, taza-2..
     public static final String PREFIJO_TAZA = "taza";
-    public static final int RADIO_BANDERA = 8; // un animal del oponente toca la bandera cuando queda a esta distancia o menos
+    public static final int RADIO_BANDERA = 5; // un animal del oponente toca la bandera cuando queda a esta distancia o menos
     public static final int ELIMINACIONES_POR_ENERGIA = 2; // cada 2 bots eliminados, cada animal vivo de la manada gana 1 de energía
     public static final int ENERGIA_POR_ELIMINACIONES = 1;
     public static final int MAXIMO_EVENTOS_GUARDADOS = 500; // cuántos eventos recientes recuerda una partida
